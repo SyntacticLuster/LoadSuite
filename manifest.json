@@ -1,5 +1,5 @@
 {
-  "name": "loadboard_mvp_ui",
+  "name": "freightlens_mvp_ui",
   "type": "output_bundle",
   "runtime": "python",
   "entrypoints": {

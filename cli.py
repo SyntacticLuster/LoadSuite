@@ -76,7 +76,7 @@ def cmd_detail(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Loadboard MVP CLI (output bundle)")
+    parser = argparse.ArgumentParser(description="FreightLens MVP CLI (output bundle)")
     parser.add_argument(
         "--data",
         default=str(Path(__file__).resolve().parent / "sample_data" / "user_lane_rate_sample.json"),

@@ -1,9 +1,9 @@
-# Runbook — Loadboard MVP (UI-first)
+# Runbook — FreightLens MVP (UI-first)
 
 ## Start server
 
 ```bash
-cd output/bundles/loadboard_mvp_ui
+cd output/bundles/freightlens_mvp_ui
 python -m uvicorn app.main:app --reload --port 8035
 ```
 
@@ -12,7 +12,7 @@ python -m uvicorn app.main:app --reload --port 8035
 Run without starting the server:
 
 ```bash
-cd output/bundles/loadboard_mvp_ui
+cd output/bundles/freightlens_mvp_ui
 poetry run python cli.py list --sort rpm_desc --limit 10
 ```
 

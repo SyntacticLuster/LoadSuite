@@ -73,6 +73,7 @@ const getHashRoute = () => {
 
 const state = {
   filtersOpen: false,
+  terminalPanelOpen: false,
   query: {
     q: "",
     equipment: "",
@@ -91,16 +92,135 @@ const state = {
     rpm_min: "",
     equipment: "",
     weight_max: "",
+    weight_min: "",
     detention: "",
+    broker_rating_min: "",
+    deadhead_max: "",
+    hazmat: "",
+    multi_stop: "",
     greenlight_sort: "",
   },
   prefs: {
     rpm_min: "",
     equipment: "",
     weight_max: "",
+    weight_min: "",
     detention: "",
+    broker_rating_min: "",
+    deadhead_max: "",
+    hazmat: "",
+    multi_stop: "",
     greenlight_sort: "",
   },
+  latestLoads: [],
+  scoredLoads: {},      // Map of load_id -> score data
+  watchlist: new Set(), // Set of watched load IDs
+  filterPresets: [],    // Saved filter presets
+};
+
+const NEWS_TICKER_REFRESH_MS = 5 * 60 * 1000;
+const GREENLIGHT_TICKER_MAX = 6;
+const newsTickerState = { items: [] };
+
+// =============================================================================
+// API Helpers for Terminal Workflows
+// =============================================================================
+
+const apiPut = async (path, body) => {
+  const res = await fetch(path, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return await res.json();
+};
+
+const apiDelete = async (path) => {
+  const res = await fetch(path, { method: "DELETE" });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return await res.json();
+};
+
+const fetchScoredLoads = async () => {
+  try {
+    const qs = buildQueryString();
+    const res = await apiGet(`/api/loads/scored${qs}&limit=100`);
+    state.scoredLoads = {};
+    for (const item of res.loads || []) {
+      state.scoredLoads[item.load.id] = {
+        score: item.score,
+        greenlight: item.greenlight,
+        top_reasons: item.top_reasons || [],
+        confidence: item.confidence,
+      };
+    }
+  } catch (err) {
+    console.error("Failed to fetch scored loads:", err);
+  }
+};
+
+const fetchWatchlist = async () => {
+  try {
+    const res = await apiGet("/api/watchlist");
+    state.watchlist = new Set((res.items || []).map((i) => i.load_id).filter(Boolean));
+  } catch (err) {
+    console.error("Failed to fetch watchlist:", err);
+  }
+};
+
+const toggleWatchlist = async (loadId) => {
+  try {
+    if (state.watchlist.has(loadId)) {
+      // Find and delete
+      const res = await apiGet("/api/watchlist");
+      const item = (res.items || []).find((i) => i.load_id === loadId);
+      if (item) {
+        await apiDelete(`/api/watchlist/${item.id}`);
+        state.watchlist.delete(loadId);
+      }
+    } else {
+      await apiPostJson("/api/watchlist", { item_type: "load", load_id: loadId });
+      state.watchlist.add(loadId);
+    }
+    render();
+  } catch (err) {
+    console.error("Failed to toggle watchlist:", err);
+  }
+};
+
+const fetchFilterPresets = async () => {
+  try {
+    const res = await apiGet("/api/presets");
+    state.filterPresets = res.presets || [];
+  } catch (err) {
+    console.error("Failed to fetch presets:", err);
+  }
+};
+
+const saveFilterPreset = async (name) => {
+  try {
+    await apiPostJson("/api/presets", { name, filters: { ...state.query } });
+    await fetchFilterPresets();
+    render();
+  } catch (err) {
+    console.error("Failed to save preset:", err);
+  }
+};
+
+const loadFilterPreset = (preset) => {
+  state.query = { ...state.query, ...preset.filters };
+  render();
+};
+
+const deleteFilterPreset = async (presetId) => {
+  try {
+    await apiDelete(`/api/presets/${presetId}`);
+    await fetchFilterPresets();
+    render();
+  } catch (err) {
+    console.error("Failed to delete preset:", err);
+  }
 };
 
 const parseOptionalNumber = (raw) => {
@@ -113,33 +233,93 @@ const parseOptionalNumber = (raw) => {
 const prefStatus = (load) => {
   const rpmMin = parseOptionalNumber(state.prefs.rpm_min);
   const weightMax = parseOptionalNumber(state.prefs.weight_max);
+  const weightMin = parseOptionalNumber(state.prefs.weight_min);
+  const brokerRatingMin = parseOptionalNumber(state.prefs.broker_rating_min);
+  const deadheadMax = parseOptionalNumber(state.prefs.deadhead_max);
+  const hazmatPref = state.prefs.hazmat;
+  const multiStopPref = state.prefs.multi_stop;
 
   const rpmOk = rpmMin === null ? null : load.rpm >= rpmMin;
   const equipmentOk = !state.prefs.equipment ? null : load.equipment === state.prefs.equipment;
   const weightOk = weightMax === null ? null : load.weight_lbs <= weightMax;
+  const weightMinOk = weightMin === null ? null : load.weight_lbs >= weightMin;
+  const brokerOk = brokerRatingMin === null ? null : load.broker.rating >= brokerRatingMin;
+  const deadheadOk = deadheadMax === null ? null : load.deadhead_miles <= deadheadMax;
 
   let detentionOk = null;
   if (state.prefs.detention === "true") detentionOk = !!load.detention;
   else if (state.prefs.detention === "false") detentionOk = !load.detention;
 
-  return { rpmOk, equipmentOk, weightOk, detentionOk };
+  let hazmatOk = null;
+  if (hazmatPref === "true") hazmatOk = !!load.hazmat;
+  else if (hazmatPref === "false") hazmatOk = !load.hazmat;
+
+  let multiStopOk = null;
+  if (multiStopPref === "true") multiStopOk = !!load.multi_stop;
+  else if (multiStopPref === "false") multiStopOk = !load.multi_stop;
+
+  return {
+    rpmOk,
+    equipmentOk,
+    weightOk,
+    weightMinOk,
+    detentionOk,
+    brokerOk,
+    deadheadOk,
+    hazmatOk,
+    multiStopOk,
+  };
 };
 
 const isGreenLight = (load) => {
   const prefs = state.prefs;
   const rpmMin = parseOptionalNumber(prefs.rpm_min);
   const weightMax = parseOptionalNumber(prefs.weight_max);
+  const weightMin = parseOptionalNumber(prefs.weight_min);
+  const brokerRatingMin = parseOptionalNumber(prefs.broker_rating_min);
+  const deadheadMax = parseOptionalNumber(prefs.deadhead_max);
   const equipmentActive = !!prefs.equipment;
   const detentionActive = prefs.detention === "true" || prefs.detention === "false";
+  const hazmatActive = prefs.hazmat === "true" || prefs.hazmat === "false";
+  const brokerActive = brokerRatingMin !== null;
+  const deadheadActive = deadheadMax !== null;
+  const weightMinActive = weightMin !== null;
+  const multiStopActive = prefs.multi_stop === "true" || prefs.multi_stop === "false";
 
-  if (rpmMin === null && weightMax === null && !equipmentActive && !detentionActive) return true;
+  if (
+    rpmMin === null &&
+    weightMax === null &&
+    !equipmentActive &&
+    !detentionActive &&
+    !brokerActive &&
+    !deadheadActive &&
+    !weightMinActive &&
+    !hazmatActive &&
+    !multiStopActive
+  )
+    return true;
 
-  const { rpmOk, equipmentOk, weightOk, detentionOk } = prefStatus(load);
+  const {
+    rpmOk,
+    equipmentOk,
+    weightOk,
+    weightMinOk,
+    detentionOk,
+    brokerOk,
+    deadheadOk,
+    hazmatOk,
+    multiStopOk,
+  } = prefStatus(load);
   const checks = [
     rpmMin === null ? null : rpmOk,
     equipmentActive ? equipmentOk : null,
     weightMax === null ? null : weightOk,
+    weightMinActive ? weightMinOk : null,
     detentionActive ? detentionOk : null,
+    brokerActive ? brokerOk : null,
+    deadheadActive ? deadheadOk : null,
+    hazmatActive ? hazmatOk : null,
+    multiStopActive ? multiStopOk : null,
   ];
   return checks.every((v) => v === null || v === true);
 };
@@ -149,9 +329,16 @@ const hasActivePrefs = () => {
   return (
     String(prefs.rpm_min ?? "").trim() !== "" ||
     String(prefs.weight_max ?? "").trim() !== "" ||
+    String(prefs.weight_min ?? "").trim() !== "" ||
     String(prefs.equipment ?? "").trim() !== "" ||
     prefs.detention === "true" ||
-    prefs.detention === "false"
+    prefs.detention === "false" ||
+    String(prefs.broker_rating_min ?? "").trim() !== "" ||
+    String(prefs.deadhead_max ?? "").trim() !== "" ||
+    prefs.hazmat === "true" ||
+    prefs.hazmat === "false" ||
+    prefs.multi_stop === "true" ||
+    prefs.multi_stop === "false"
   );
 };
 
@@ -220,11 +407,37 @@ const renderList = async (root) => {
     [state.filtersOpen ? "Hide Filters & Sort" : "Show Filters & Sort"]
   );
 
+  // Terminal workflows toggle button
+  const terminalBtn = el(
+    "button",
+    {
+      class:
+        "w-full rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+      onclick: () => {
+        state.terminalPanelOpen = !state.terminalPanelOpen;
+        render();
+      },
+    },
+    [state.terminalPanelOpen ? "Hide Terminal Workflows" : "📋 Terminal Workflows"]
+  );
+
   top.appendChild(searchRow);
   top.appendChild(filtersBtn);
+  top.appendChild(terminalBtn);
+
   if (state.filtersOpen) {
-    top.appendChild(renderFiltersPanel());
-    top.appendChild(renderPrefsPanel());
+    const panels = el(
+      "div",
+      {
+        class: "space-y-3 pt-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0",
+      },
+      [renderFiltersPanel(), renderPrefsPanel()]
+    );
+    top.appendChild(panels);
+  }
+
+  if (state.terminalPanelOpen) {
+    top.appendChild(renderTerminalPanel());
   }
 
   const listWrap = el("div", { class: "pt-2" }, [
@@ -233,11 +446,19 @@ const renderList = async (root) => {
   top.appendChild(listWrap);
   root.appendChild(top);
 
+  // Fetch scored loads for score display
+  await fetchScoredLoads();
+  await fetchWatchlist();
+  await fetchFilterPresets();
+
   const data = await apiGet(`/api/loads${buildQueryString()}`);
   listWrap.appendChild(el("div", { class: "text-xs text-slate-600 dark:text-slate-400 pt-2" }, [`${data.total} loads`]))
 
   const ul = el("div", { class: "grid grid-cols-1 gap-2 pt-2 lg:grid-cols-2" });
-  const loads = data.loads.slice(0, 200);
+  const availableLoads = Array.isArray(data.loads) ? data.loads : [];
+  state.latestLoads = availableLoads;
+  _updateGreenlightTicker(state.latestLoads);
+  const loads = availableLoads.slice(0, 200);
   const sortedLoads = state.prefs.greenlight_sort === "on"
     ? [...loads].sort((a, b) => {
         const ag = isGreenLight(a) ? 1 : 0;
@@ -250,6 +471,12 @@ const renderList = async (root) => {
     const { rpmOk, equipmentOk, weightOk, detentionOk } = prefStatus(load);
     const greenlightActive = hasActivePrefs();
     const greenlightOk = greenlightActive ? isGreenLight(load) : false;
+
+    // Get score data if available
+    const scoreData = state.scoredLoads[load.id];
+    const hasScore = !!scoreData;
+    const scoreValue = hasScore ? scoreData.score : null;
+    const isWatched = state.watchlist.has(load.id);
 
     const maybeClass = (ok, defaultClass) => {
       if (ok === null) return defaultClass;
@@ -264,6 +491,50 @@ const renderList = async (root) => {
     const routeClass = greenlightOk
       ? "text-sm font-semibold text-green-400 dark:text-green-300"
       : "text-sm font-semibold";
+
+    // Build score badge
+    const scoreBadge = hasScore
+      ? el(
+          "span",
+          {
+            class: `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+              scoreValue >= 70
+                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                : scoreValue >= 50
+                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+            }`,
+            title: `Score: ${scoreValue.toFixed(1)}/100`,
+          },
+          [`${scoreValue.toFixed(0)}`]
+        )
+      : null;
+
+    // Build top reasons (inline, expandable)
+    const topReasons = hasScore && scoreData.top_reasons.length > 0
+      ? el("div", { class: "pt-1 text-xs text-slate-500 dark:text-slate-400 truncate" }, [
+          scoreData.top_reasons.slice(0, 2).map((r) => {
+            const icon = r.direction === "positive" ? "✓" : r.direction === "negative" ? "✗" : "○";
+            return `${icon} ${r.display_name}`;
+          }).join(" • "),
+        ])
+      : null;
+
+    // Watchlist toggle button
+    const watchlistBtn = el(
+      "button",
+      {
+        class: `ml-2 text-lg leading-none transition ${isWatched ? "text-amber-400" : "text-slate-400 hover:text-amber-400"}`,
+        title: isWatched ? "Remove from watchlist" : "Add to watchlist",
+        onclick: (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleWatchlist(load.id);
+        },
+      },
+      [isWatched ? "★" : "☆"]
+    );
+
     const row = el(
       "a",
       {
@@ -273,14 +544,21 @@ const renderList = async (root) => {
       },
       [
         el("div", { class: "flex items-start justify-between gap-2" }, [
-          el("div", { class: routeClass }, [
-            `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
-          ]),
-          el("div", { class: "text-right" }, [
-            el("div", { class: payClass }, [fmtMoney(load.rate_total_usd)]),
-            el("div", { class: rpmClass }, [`$${fmtNum(load.rpm, 2)}/mi`]),
+          el("div", { class: "flex items-center gap-2" }, [
+            el("div", { class: routeClass }, [
+              `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
+            ]),
+            scoreBadge,
+          ].filter(Boolean)),
+          el("div", { class: "flex items-center text-right" }, [
+            el("div", {}, [
+              el("div", { class: payClass }, [fmtMoney(load.rate_total_usd)]),
+              el("div", { class: rpmClass }, [`$${fmtNum(load.rpm, 2)}/mi`]),
+            ]),
+            watchlistBtn,
           ]),
         ]),
+        topReasons,
         el("div", { class: "pt-1 text-xs text-slate-700 dark:text-slate-300" }, [
           el("span", { class: equipClass }, [load.equipment]),
           " • ",
@@ -302,7 +580,7 @@ const renderList = async (root) => {
             el(
               "span",
               {
-                class: greenlightOk
+                class: greenlightOk || (hasScore && scoreData.greenlight)
                   ? "text-lg leading-none text-green-400 dark:text-green-300"
                   : "text-lg leading-none invisible",
               },
@@ -358,7 +636,7 @@ const renderPrefsPanel = () => {
   };
 
   wrap.appendChild(
-    el("div", { class: "text-sm font-semibold" }, ["Preferred parameters"])
+    el("div", { class: "text-sm font-semibold" }, ["GreenLight 🟢"])
   );
 
   wrap.appendChild(
@@ -374,9 +652,26 @@ const renderPrefsPanel = () => {
         ])
       ),
       row("Weight max (lbs)", num("weight_max", "e.g. 45000", "1")),
+      row("Weight min (lbs)", num("weight_min", "e.g. 12000", "1")),
+      row("Broker rating min", num("broker_rating_min", "e.g. 3.5")),
+      row("Deadhead max (mi)", num("deadhead_max", "e.g. 150")),
       row(
         "Detention",
         sel("detention", [
+          { value: "true", label: "Required" },
+          { value: "false", label: "No" },
+        ])
+      ),
+      row(
+        "Hazmat",
+        sel("hazmat", [
+          { value: "true", label: "Required" },
+          { value: "false", label: "No" },
+        ])
+      ),
+      row(
+        "Multi-stop",
+        sel("multi_stop", [
           { value: "true", label: "Required" },
           { value: "false", label: "No" },
         ])
@@ -419,9 +714,114 @@ const renderPrefsPanel = () => {
         render();
       },
     },
-    ["Apply preferred parameters"]
+    ["Apply GreenLight parameters"]
   );
   wrap.appendChild(applyBtn);
+
+  return wrap;
+};
+
+const renderTerminalPanel = () => {
+  const wrap = el("div", {
+    class:
+      "rounded-lg border border-emerald-500 bg-emerald-50 p-3 dark:border-emerald-600 dark:bg-emerald-900/20 space-y-4",
+  });
+
+  // Section: Save Filter Preset
+  const presetSection = el("div", { class: "space-y-2" });
+  presetSection.appendChild(
+    el("div", { class: "text-sm font-semibold text-emerald-700 dark:text-emerald-400" }, ["💾 Save Filter Preset"])
+  );
+
+  let presetNameInput;
+  const presetRow = el("div", { class: "flex gap-2" }, [
+    (presetNameInput = el("input", {
+      class:
+        "flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900",
+      placeholder: "Preset name...",
+    })),
+    el(
+      "button",
+      {
+        class:
+          "shrink-0 rounded-md bg-emerald-600 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-700",
+        onclick: () => {
+          const name = presetNameInput.value.trim();
+          if (name) {
+            saveFilterPreset(name);
+            presetNameInput.value = "";
+          }
+        },
+      },
+      ["Save"]
+    ),
+  ]);
+  presetSection.appendChild(presetRow);
+
+  // Show saved presets
+  if (state.filterPresets.length > 0) {
+    const presetList = el("div", { class: "flex flex-wrap gap-2 pt-1" });
+    for (const preset of state.filterPresets) {
+      presetList.appendChild(
+        el("div", { class: "flex items-center gap-1 rounded bg-slate-200 dark:bg-slate-700 px-2 py-1 text-xs" }, [
+          el(
+            "button",
+            {
+              class: "text-slate-700 dark:text-slate-200 hover:underline",
+              onclick: () => loadFilterPreset(preset),
+            },
+            [preset.name]
+          ),
+          el(
+            "button",
+            {
+              class: "text-red-500 hover:text-red-700 ml-1",
+              onclick: () => deleteFilterPreset(preset.id),
+            },
+            ["×"]
+          ),
+        ])
+      );
+    }
+    presetSection.appendChild(presetList);
+  }
+  wrap.appendChild(presetSection);
+
+  // Section: Watchlist summary
+  const watchlistSection = el("div", { class: "space-y-2" });
+  watchlistSection.appendChild(
+    el("div", { class: "text-sm font-semibold text-emerald-700 dark:text-emerald-400" }, ["👁️ Watchlist"])
+  );
+  const watchCount = state.watchlist.size;
+  watchlistSection.appendChild(
+    el("div", { class: "text-xs text-slate-600 dark:text-slate-400" }, [
+      watchCount > 0
+        ? `${watchCount} load${watchCount > 1 ? "s" : ""} watched. Toggle ☆ on any load card.`
+        : "No loads watched yet. Click ☆ on a load card to add.",
+    ])
+  );
+  wrap.appendChild(watchlistSection);
+
+  // Section: Alerts placeholder
+  const alertsSection = el("div", { class: "space-y-2" });
+  alertsSection.appendChild(
+    el("div", { class: "text-sm font-semibold text-emerald-700 dark:text-emerald-400" }, ["🔔 Alerts"])
+  );
+  alertsSection.appendChild(
+    el("div", { class: "text-xs text-slate-600 dark:text-slate-400" }, [
+      "Alert rules coming soon. Create rules to get notified when loads match your criteria.",
+    ])
+  );
+  const alertPlaceholder = el(
+    "div",
+    { class: "rounded border border-dashed border-slate-400 p-3 text-center text-xs text-slate-500 dark:border-slate-600" },
+    [
+      el("div", {}, ["No alert rules configured"]),
+      el("div", { class: "pt-1 text-[0.65rem]" }, ["(Alert execution is TODO)"]),
+    ]
+  );
+  alertsSection.appendChild(alertPlaceholder);
+  wrap.appendChild(alertsSection);
 
   return wrap;
 };
@@ -529,15 +929,89 @@ const renderFiltersPanel = () => {
 
 const renderDetail = async (root, id) => {
   const load = await apiGet(`/api/loads/${id}`);
+  
+  // Fetch score for this load
+  let scoreData = null;
+  try {
+    const scored = await apiGet(`/api/loads/${id}/score`);
+    scoreData = scored;
+  } catch (err) {
+    console.error("Failed to fetch score:", err);
+  }
+
+  // Check watchlist status
+  await fetchWatchlist();
+  const isWatched = state.watchlist.has(id);
+
   const back = el(
     "a",
     { href: "/#/", class: "text-sm font-medium underline" },
     ["← Back"]
   );
 
+  // Score badge and GreenLight indicator
+  const scoreBadge = scoreData
+    ? el(
+        "div",
+        {
+          class: `inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${
+            scoreData.score >= 70
+              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+              : scoreData.score >= 50
+              ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+          }`,
+        },
+        [`Score: ${scoreData.score.toFixed(1)}`]
+      )
+    : null;
+
+  const greenlightBadge = scoreData && scoreData.greenlight
+    ? el("span", { class: "ml-2 text-lg" }, ["🟢 GreenLight"])
+    : null;
+
+  // Top reasons section
+  const reasonsSection = scoreData && scoreData.top_reasons.length > 0
+    ? el("div", { class: "pt-3" }, [
+        el("div", { class: "text-xs font-semibold text-slate-600 dark:text-slate-400 pb-1" }, ["Score Factors"]),
+        ...scoreData.top_reasons.map((r) => {
+          const icon = r.direction === "positive" ? "✓" : r.direction === "negative" ? "✗" : "○";
+          const colorClass =
+            r.direction === "positive"
+              ? "text-green-600 dark:text-green-400"
+              : r.direction === "negative"
+              ? "text-red-600 dark:text-red-400"
+              : "text-slate-600 dark:text-slate-400";
+          return el("div", { class: `text-xs ${colorClass} py-0.5` }, [
+            `${icon} ${r.explanation}`,
+          ]);
+        }),
+      ])
+    : null;
+
+  // Watchlist button
+  const watchlistBtn = el(
+    "button",
+    {
+      class: `rounded-md px-3 py-2 text-sm font-medium ${
+        isWatched
+          ? "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+          : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+      }`,
+      onclick: () => toggleWatchlist(id),
+    },
+    [isWatched ? "★ Watching" : "☆ Add to Watchlist"]
+  );
+
   const card = el("div", { class: "mt-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" }, [
-    el("div", { class: "text-base font-semibold" }, [
-      `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
+    el("div", { class: "flex items-center justify-between gap-2" }, [
+      el("div", { class: "text-base font-semibold" }, [
+        `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
+      ]),
+      el("div", { class: "flex items-center gap-2" }, [
+        scoreBadge,
+        greenlightBadge,
+      ].filter(Boolean)),
     ]),
     el("div", { class: "pt-2 text-sm" }, [
       el("div", { class: "flex justify-between" }, [
@@ -572,6 +1046,8 @@ const renderDetail = async (root, id) => {
       load.multi_stop ? " • Multi-stop" : "",
       load.lane_history ? " • Lane history" : "",
     ]),
+    reasonsSection,
+    el("div", { class: "pt-3" }, [watchlistBtn]),
   ]);
 
   root.appendChild(back);
@@ -670,7 +1146,124 @@ const renderSettings = async (root) => {
   root.appendChild(box);
 };
 
+const _formatTickerTime = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.valueOf())) return null;
+  return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
+const _buildTickerEntry = (item) => {
+  const timeLabel = _formatTickerTime(item.published);
+  const badge = el(
+    "span",
+    { class: "flex-shrink-0 text-[0.55rem] font-semibold tracking-[0.35em] text-emerald-200" },
+    [item.source || "News"]
+  );
+  const title = el(
+    "span",
+    { class: "text-sm font-semibold text-white" },
+    [item.title]
+  );
+  const divider = el("span", { class: "text-slate-200 opacity-70" }, ["—"]);
+  const time = timeLabel
+    ? el("span", { class: "ml-1 text-[0.6rem] uppercase tracking-[0.4em] text-slate-200" }, [timeLabel])
+    : null;
+
+  const entry = el(
+    "a",
+    {
+      class: "flex min-w-max items-center gap-2 opacity-90 hover:opacity-100 focus-visible:opacity-100",
+      href: item.link || "#",
+      target: "_blank",
+      rel: "noreferrer",
+    },
+    [badge, divider, title, time].filter(Boolean)
+  );
+  return entry;
+};
+
+const _updateGreenlightTicker = (loads = []) => {
+  const track = document.getElementById("greenlight-marquee-track");
+  if (!track) return;
+  track.innerHTML = "";
+  const greenlightActive = hasActivePrefs();
+  const entryBuilders = [];
+
+  if (!greenlightActive) {
+    entryBuilders.push(() =>
+      el("span", { class: "text-[0.65rem] text-slate-500" }, ["Set preferred parameters to unlock GreenLight alerts"])
+    );
+  } else {
+    const greenlightLoads = (loads ?? [])
+      .filter((load) => isGreenLight(load))
+      .slice(0, GREENLIGHT_TICKER_MAX);
+
+    if (!greenlightLoads.length) {
+      entryBuilders.push(() =>
+        el("span", { class: "text-[0.65rem] text-slate-500" }, ["No GreenLight-ready lanes right now"])
+      );
+    } else {
+      for (const load of greenlightLoads) {
+        entryBuilders.push(() => {
+          const route = `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`;
+          return el(
+            "a",
+            {
+              href: `/#/load/${load.id}`,
+              class: "text-[0.75rem] font-semibold tracking-wide text-emerald-400 transition hover:text-emerald-100",
+            },
+            [`${route} • ${fmtMoney(load.rate_total_usd)}`]
+          );
+        });
+      }
+    }
+  }
+
+  const fragment = document.createDocumentFragment();
+  const appendBatch = () => {
+    for (const build of entryBuilders) {
+      fragment.appendChild(build());
+    }
+  };
+  appendBatch();
+  appendBatch();
+  track.appendChild(fragment);
+};
+
+const _updateNewsTicker = (items) => {
+  const track = document.getElementById("news-marquee-track");
+  if (!track) return;
+  track.innerHTML = "";
+  const entries = (items && items.length ? items : [{ title: "News temporarily unavailable", link: "#", source: "Freight" }]);
+  const fragment = document.createDocumentFragment();
+  const appendBatch = () => {
+    for (const entry of entries) {
+      fragment.appendChild(_buildTickerEntry(entry));
+    }
+  };
+  appendBatch();
+  appendBatch();
+  track.appendChild(fragment);
+};
+
+const loadNewsTicker = async () => {
+  try {
+    const payload = await apiGet("/api/news");
+    newsTickerState.items = payload.items ?? [];
+  } catch (err) {
+    console.error("failed to refresh news ticker", err);
+  }
+  _updateNewsTicker(newsTickerState.items);
+};
+
+const initNewsTicker = () => {
+  loadNewsTicker();
+  setInterval(loadNewsTicker, NEWS_TICKER_REFRESH_MS);
+};
+
 window.addEventListener("hashchange", render);
 applyTheme(getTheme());
 state.prefsDraft = { ...state.prefs };
 setMeta().then(render);
+initNewsTicker();
