@@ -1072,3 +1072,107 @@ curl -X POST "http://localhost:8035/api/refresh" \
   -H "Content-Type: application/json" \
   -d '{"count": 500}'
 ```
+
+---
+
+## Trust Metadata in Responses
+
+All load responses include trust metadata for UI confidence/provenance display. See [TRUST_UI_SPEC.md](TRUST_UI_SPEC.md) for full specification.
+
+### Trust Fields (Required)
+
+Every load object includes a `trust` property:
+
+```json
+{
+  "id": "abc-123",
+  "rate_total_usd": 1850.00,
+  "score": 92,
+  "trust": {
+    "confidence_score": 88,
+    "confidence_bucket": "high",
+    "confidence_reasons": [
+      {"factor": "core_fields_present", "contribution": 40},
+      {"factor": "broker_reviews_count", "contribution": 20},
+      {"factor": "data_freshness", "contribution": 15},
+      {"factor": "source_verified", "contribution": 15},
+      {"factor": "facility_data_missing", "contribution": -2}
+    ],
+    "missing_fields": ["facility_id", "dwell_estimate"],
+    "provenance": {
+      "source_type": "partner",
+      "source_name": "Acme Logistics API",
+      "acquired_at": "2024-12-19T15:15:00Z"
+    },
+    "freshness_seconds": 900,
+    "freshness_bucket": "fresh",
+    "rights_state": "compliant",
+    "rights_restrictions": []
+  }
+}
+```
+
+### Confidence Breakdown Endpoint
+
+#### GET /api/loads/{load_id}/confidence
+
+Get detailed confidence score breakdown for a load.
+
+**Response:**
+
+```json
+{
+  "load_id": "abc-123",
+  "confidence_score": 88,
+  "confidence_bucket": "high",
+  "breakdown": [
+    {
+      "factor": "core_fields_present",
+      "label": "Core fields verified",
+      "contribution": 40,
+      "details": "Rate, distance, equipment, pickup, delivery all present"
+    },
+    {
+      "factor": "broker_reviews_count",
+      "label": "Broker reputation depth",
+      "contribution": 20,
+      "details": "156 verified reviews"
+    }
+  ],
+  "penalties": [
+    {
+      "factor": "facility_data_missing",
+      "label": "Facility not in database",
+      "contribution": -2,
+      "details": "No dwell or detention estimates available"
+    }
+  ]
+}
+```
+
+### Restricted Data Redaction
+
+Loads with `rights_state: "restricted"` have certain fields redacted:
+
+```json
+{
+  "broker": {
+    "name": "Beta Freight",
+    "mc_number": "[RESTRICTED]",
+    "phone": "[RESTRICTED]",
+    "rating": 3.8
+  },
+  "trust": {
+    "rights_state": "restricted",
+    "rights_restrictions": [
+      {"field": "broker.mc_number", "reason": "source_terms"},
+      {"field": "broker.phone", "reason": "source_terms"}
+    ]
+  }
+}
+```
+
+**Redaction Rules:**
+- Restricted fields display `[RESTRICTED]` placeholder
+- `rights_restrictions` array lists each redacted field with reason
+- Export endpoints exclude restricted data entirely

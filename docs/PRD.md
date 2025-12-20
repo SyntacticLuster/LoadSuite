@@ -289,3 +289,14 @@ With follow-up intelligence:
 | Trucker Path | Driver community | Limited decision support |
 
 **FreightLens Differentiation:** Carrier-first scoring, transparent analytics, configurable decision engine, no broker bias.
+
+---
+
+## 13. Related Documentation
+
+| Document | Relevance |
+|----------|----------|
+| [MONETIZATION.md](MONETIZATION.md) | Outcome-based pricing tiers tied to measurable user value |
+| [SCORING_CALIBRATION.md](SCORING_CALIBRATION.md) | How we validate GreenLight scores against real outcomes |
+| [TRUST_UI_SPEC.md](TRUST_UI_SPEC.md) | Inline confidence and provenance display specification |
+| [DATA_RIGHTS_AND_SOURCING.md](DATA_RIGHTS_AND_SOURCING.md) | Data governance and licensing policy |

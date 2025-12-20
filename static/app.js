@@ -286,6 +286,8 @@ const isGreenLight = (load) => {
   const weightMinActive = weightMin !== null;
   const multiStopActive = prefs.multi_stop === "true" || prefs.multi_stop === "false";
 
+  // When no preference is set we should not auto-signal a perfect green light.
+  // Returning true here causes every load to appear greenlit even with an empty preference set.
   if (
     rpmMin === null &&
     weightMax === null &&
@@ -297,7 +299,7 @@ const isGreenLight = (load) => {
     !hazmatActive &&
     !multiStopActive
   )
-    return true;
+    return false;
 
   const {
     rpmOk,
@@ -404,7 +406,7 @@ const renderList = async (root) => {
         render();
       },
     },
-    [state.filtersOpen ? "Hide Filters & Sort" : "Show Filters & Sort"]
+    [state.filtersOpen ? "Hide Filters, Sort & GreenLight" : "Show Filters, Sort & GreenLight"]
   );
 
   // Terminal workflows toggle button
@@ -580,7 +582,7 @@ const renderList = async (root) => {
             el(
               "span",
               {
-                class: greenlightOk || (hasScore && scoreData.greenlight)
+                class: greenlightOk
                   ? "text-lg leading-none text-green-400 dark:text-green-300"
                   : "text-lg leading-none invisible",
               },
@@ -966,7 +968,7 @@ const renderDetail = async (root, id) => {
       )
     : null;
 
-  const greenlightBadge = scoreData && scoreData.greenlight
+  const greenlightBadge = hasActivePrefs() && isGreenLight(load)
     ? el("span", { class: "ml-2 text-lg" }, ["🟢 GreenLight"])
     : null;
 

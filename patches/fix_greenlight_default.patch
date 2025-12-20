@@ -1,0 +1,8 @@
+--- a/static/app.js
++++ b/static/app.js
+@@
+-  if (rpmMin === null && weightMax === null && !equipmentActive && !detentionActive) return true;
++  // When no preferred parameters are set, do not assume loads are greenlit.
++  // Returning true here causes every load to appear greenlit even when no criteria is selected.
++  // Instead, return false so the green light indicator only appears when the user has specified at least one preference.
++  if (rpmMin === null && weightMax === null && !equipmentActive && !detentionActive) return false;

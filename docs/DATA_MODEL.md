@@ -738,3 +738,98 @@ All schemas follow these principles:
 4. **Validated** — Pydantic enforces constraints
 
 Current schema version: **1.0.0**
+
+---
+
+## 9. Outcome Labels (Scoring Validation)
+
+User-provided and inferred outcomes for GreenLight score validation. See [SCORING_CALIBRATION.md](SCORING_CALIBRATION.md) for full methodology.
+
+```python
+class OutcomeLabel:
+    """Ground truth label for scoring validation."""
+    
+    id: str                          # UUID
+    load_id: str                     # Reference to scored load
+    user_id: str                     # Who provided the label
+    
+    # Timing
+    accepted_at: datetime            # When user accepted the load
+    labeled_at: datetime             # When outcome was reported
+    
+    # Core outcomes
+    user_satisfaction: int | None    # 1-5 rating
+    would_accept_again: bool | None  # Binary recommendation
+    fallthrough: bool                # Did load fall through?
+    fallthrough_reason: str | None   # Enum: broker_cancelled, rate_changed, etc.
+    
+    # Financial outcomes (optional)
+    actual_rate_usd: float | None
+    actual_miles_loaded: float | None
+    actual_miles_deadhead: float | None
+    actual_fuel_cost_usd: float | None
+    profitability_realized: float | None  # Computed if actuals provided
+    
+    # Operational outcomes (optional)
+    detention_minutes: int | None
+    payment_received_at: datetime | None
+    payment_delay_days: int | None   # Computed
+    
+    # Metadata
+    label_source: LabelSource        # "user_explicit", "user_implicit", "inferred"
+    confidence: LabelConfidence      # "high", "medium", "low"
+    notes: str | None
+    
+    # Provenance
+    created_at: datetime
+    updated_at: datetime
+
+
+class LabelSource(str, Enum):
+    USER_EXPLICIT = "user_explicit"   # User entered in form
+    USER_IMPLICIT = "user_implicit"   # Inferred from actions
+    INFERRED = "inferred"             # System-derived
+    SYNTHETIC = "synthetic"           # Test/bootstrap data
+
+
+class LabelConfidence(str, Enum):
+    HIGH = "high"       # User-provided core fields
+    MEDIUM = "medium"   # Partial data or implicit
+    LOW = "low"         # Inferred with uncertainty
+```
+
+---
+
+## 10. Trust Metadata
+
+Every load response includes trust metadata for UI display. See [TRUST_UI_SPEC.md](TRUST_UI_SPEC.md) for display requirements.
+
+```python
+class TrustMetadata:
+    """Trust signals bundled with load responses."""
+    
+    confidence_score: int            # 0-100
+    confidence_bucket: str           # "high", "medium", "low"
+    confidence_reasons: list[ConfidenceReason]
+    
+    missing_fields: list[str]        # Fields that could not be populated
+    
+    provenance: Provenance           # Source and timing info
+    
+    freshness_seconds: int           # Age since acquisition
+    freshness_bucket: str            # "fresh", "recent", "stale", "expired"
+    
+    rights_state: str                # "compliant", "restricted", "quarantined"
+    rights_restrictions: list[RightsRestriction]
+
+
+class ConfidenceReason:
+    factor: str                      # e.g., "core_fields_present"
+    contribution: int                # Points added/subtracted
+    details: str | None              # Human-readable explanation
+
+
+class RightsRestriction:
+    field: str                       # e.g., "broker.phone"
+    reason: str                      # e.g., "source_terms"
+```

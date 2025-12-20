@@ -21,6 +21,10 @@ Welcome to the FreightLens technical documentation. This directory contains all 
 | [OBSERVABILITY.md](OBSERVABILITY.md) | Structured logging, metrics, tracing, alerting |
 | [ROADMAP.md](ROADMAP.md) | Phased delivery with milestones (Phase 0–5+) |
 | [TESTING.md](TESTING.md) | Testing strategy, fixtures, synthetic data, CI/CD |
+| [DATA_RIGHTS_AND_SOURCING.md](DATA_RIGHTS_AND_SOURCING.md) | Data provenance, licensing, quarantine rules |
+| [MONETIZATION.md](MONETIZATION.md) | Outcome-based pricing tiers, value proof, KPIs |
+| [SCORING_CALIBRATION.md](SCORING_CALIBRATION.md) | Ground truth, validation, weight governance, anti-score-theater |
+| [TRUST_UI_SPEC.md](TRUST_UI_SPEC.md) | Confidence, provenance, freshness UI; acceptance criteria |
 
 ---
 

@@ -1,102 +1,262 @@
 [
   {
-    "id": "9048ffd0-981a-4fea-bcfd-d48f2364726e",
+    "id": "cfe00efb-cac8-4410-b06c-041df4391fc2",
     "origin": {
-      "city": "Denver",
-      "state": "CO"
+      "city": "Los Angeles",
+      "state": "CA"
+    },
+    "destination": {
+      "city": "Miami",
+      "state": "FL"
+    },
+    "pickup_start": "2025-12-22T05:29:42.173777Z",
+    "pickup_end": "2025-12-22T07:29:42.173777Z",
+    "delivery_start": "2025-12-22T15:29:42.173777Z",
+    "delivery_end": "2025-12-22T21:29:42.173777Z",
+    "equipment": "Flatbed",
+    "weight_lbs": 38935,
+    "hazmat": false,
+    "distance_miles": 153.0,
+    "deadhead_miles": 171.0,
+    "rate_total_usd": 477.23,
+    "rpm": 3.119,
+    "broker": {
+      "name": "Canyon Freight",
+      "rating": 3.2
+    },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": true,
+    "commodity": "Building Materials",
+    "posted_at": "2025-12-18T12:29:42.173777Z",
+    "updated_at": "2025-12-20T03:38:42.173777Z"
+  },
+  {
+    "id": "df800019-f184-4b58-987c-860299139439",
+    "origin": {
+      "city": "Kansas City",
+      "state": "MO"
+    },
+    "destination": {
+      "city": "Chicago",
+      "state": "IL"
+    },
+    "pickup_start": "2025-12-22T17:29:42.173777Z",
+    "pickup_end": "2025-12-23T02:29:42.173777Z",
+    "delivery_start": "2025-12-24T12:29:42.173777Z",
+    "delivery_end": "2025-12-24T21:29:42.173777Z",
+    "equipment": "Flatbed",
+    "weight_lbs": 38550,
+    "hazmat": false,
+    "distance_miles": 1447.0,
+    "deadhead_miles": 98.0,
+    "rate_total_usd": 4664.46,
+    "rpm": 3.224,
+    "broker": {
+      "name": "Evergreen Transport",
+      "rating": 3.0
+    },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "Building Materials",
+    "posted_at": "2025-12-19T19:29:42.173777Z",
+    "updated_at": "2025-12-20T02:16:42.173777Z"
+  },
+  {
+    "id": "ff4a72fc-0b3b-4073-8aad-f6d7f9721b64",
+    "origin": {
+      "city": "Chicago",
+      "state": "IL"
+    },
+    "destination": {
+      "city": "Nashville",
+      "state": "TN"
+    },
+    "pickup_start": "2025-12-21T23:29:42.173777Z",
+    "pickup_end": "2025-12-22T05:29:42.173777Z",
+    "delivery_start": "2025-12-23T23:29:42.173777Z",
+    "delivery_end": "2025-12-24T04:29:42.173777Z",
+    "equipment": "Dry Van",
+    "weight_lbs": 13931,
+    "hazmat": false,
+    "distance_miles": 1718.0,
+    "deadhead_miles": 129.0,
+    "rate_total_usd": 5253.91,
+    "rpm": 3.058,
+    "broker": {
+      "name": "Delta Carrier Services",
+      "rating": 4.0
+    },
+    "detention": true,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "Building Materials",
+    "posted_at": "2025-12-18T06:29:42.173777Z",
+    "updated_at": "2025-12-20T03:25:42.173777Z"
+  },
+  {
+    "id": "6220e4d3-fd1a-4fad-8cf0-5c3e8d8c1761",
+    "origin": {
+      "city": "Los Angeles",
+      "state": "CA"
+    },
+    "destination": {
+      "city": "Atlanta",
+      "state": "GA"
+    },
+    "pickup_start": "2025-12-22T12:29:42.173777Z",
+    "pickup_end": "2025-12-22T22:29:42.173777Z",
+    "delivery_start": "2025-12-23T14:29:42.173777Z",
+    "delivery_end": "2025-12-23T19:29:42.173777Z",
+    "equipment": "Flatbed",
+    "weight_lbs": 22931,
+    "hazmat": false,
+    "distance_miles": 1253.0,
+    "deadhead_miles": 109.0,
+    "rate_total_usd": 3178.68,
+    "rpm": 2.537,
+    "broker": {
+      "name": "Delta Carrier Services",
+      "rating": 2.7
+    },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": true,
+    "commodity": "Food",
+    "posted_at": "2025-12-18T05:29:42.173777Z",
+    "updated_at": "2025-12-20T04:03:42.173777Z"
+  },
+  {
+    "id": "a2ce6097-2d0c-4131-9ebd-0f41b29cf6f8",
+    "origin": {
+      "city": "Chicago",
+      "state": "IL"
     },
     "destination": {
       "city": "Salt Lake City",
       "state": "UT"
     },
-    "pickup_start": "2025-12-22T02:04:53.961651Z",
-    "pickup_end": "2025-12-22T09:04:53.961651Z",
-    "delivery_start": "2025-12-24T16:04:53.961651Z",
-    "delivery_end": "2025-12-24T18:04:53.961651Z",
-    "equipment": "Reefer",
-    "weight_lbs": 11823,
+    "pickup_start": "2025-12-22T07:29:42.173777Z",
+    "pickup_end": "2025-12-22T16:29:42.173777Z",
+    "delivery_start": "2025-12-24T09:29:42.173777Z",
+    "delivery_end": "2025-12-24T11:29:42.173777Z",
+    "equipment": "Flatbed",
+    "weight_lbs": 44255,
     "hazmat": false,
-    "distance_miles": 1019.0,
-    "deadhead_miles": 69.0,
-    "rate_total_usd": 3157.54,
-    "rpm": 3.099,
+    "distance_miles": 2017.0,
+    "deadhead_miles": 245.0,
+    "rate_total_usd": 4385.99,
+    "rpm": 2.175,
+    "broker": {
+      "name": "Bluebird Brokerage",
+      "rating": 2.8
+    },
+    "detention": false,
+    "multi_stop": true,
+    "lane_history": false,
+    "commodity": "Building Materials",
+    "posted_at": "2025-12-18T12:29:42.173777Z",
+    "updated_at": "2025-12-20T04:17:42.173777Z"
+  },
+  {
+    "id": "c93fda15-c7a9-42a5-8633-2a3de1b55dad",
+    "origin": {
+      "city": "Miami",
+      "state": "FL"
+    },
+    "destination": {
+      "city": "Phoenix",
+      "state": "AZ"
+    },
+    "pickup_start": "2025-12-21T23:29:42.173777Z",
+    "pickup_end": "2025-12-22T01:29:42.173777Z",
+    "delivery_start": "2025-12-22T23:29:42.173777Z",
+    "delivery_end": "2025-12-23T05:29:42.173777Z",
+    "equipment": "Power Only",
+    "weight_lbs": 35394,
+    "hazmat": false,
+    "distance_miles": 1787.0,
+    "deadhead_miles": 174.0,
+    "rate_total_usd": 4379.53,
+    "rpm": 2.451,
+    "broker": {
+      "name": "Canyon Freight",
+      "rating": 3.7
+    },
+    "detention": false,
+    "multi_stop": true,
+    "lane_history": false,
+    "commodity": "Building Materials",
+    "posted_at": "2025-12-18T19:29:42.173777Z",
+    "updated_at": "2025-12-20T03:28:42.173777Z"
+  },
+  {
+    "id": "0d0f555c-60c4-43ce-955e-18c96cb3b971",
+    "origin": {
+      "city": "Kansas City",
+      "state": "MO"
+    },
+    "destination": {
+      "city": "Los Angeles",
+      "state": "CA"
+    },
+    "pickup_start": "2025-12-21T20:29:42.173777Z",
+    "pickup_end": "2025-12-22T06:29:42.173777Z",
+    "delivery_start": "2025-12-24T10:29:42.173777Z",
+    "delivery_end": "2025-12-24T12:29:42.173777Z",
+    "equipment": "Dry Van",
+    "weight_lbs": 37297,
+    "hazmat": false,
+    "distance_miles": 1236.0,
+    "deadhead_miles": 49.0,
+    "rate_total_usd": 2146.71,
+    "rpm": 1.737,
+    "broker": {
+      "name": "Delta Carrier Services",
+      "rating": 3.7
+    },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": true,
+    "commodity": "Paper",
+    "posted_at": "2025-12-18T11:29:42.173777Z",
+    "updated_at": "2025-12-20T03:02:42.173777Z"
+  },
+  {
+    "id": "ffbb1755-e432-4283-9d7d-8b2c0112ae3c",
+    "origin": {
+      "city": "Salt Lake City",
+      "state": "UT"
+    },
+    "destination": {
+      "city": "Dallas",
+      "state": "TX"
+    },
+    "pickup_start": "2025-12-20T19:29:42.173777Z",
+    "pickup_end": "2025-12-21T03:29:42.173777Z",
+    "delivery_start": "2025-12-23T11:29:42.173777Z",
+    "delivery_end": "2025-12-23T19:29:42.173777Z",
+    "equipment": "Reefer",
+    "weight_lbs": 7722,
+    "hazmat": false,
+    "distance_miles": 1275.0,
+    "deadhead_miles": 25.0,
+    "rate_total_usd": 3965.65,
+    "rpm": 3.11,
     "broker": {
       "name": "Bluebird Brokerage",
       "rating": 4.7
     },
     "detention": false,
     "multi_stop": false,
-    "lane_history": true,
-    "commodity": "General Freight",
-    "posted_at": "2025-12-18T12:04:53.961651Z",
-    "updated_at": "2025-12-20T01:41:53.961651Z"
-  },
-  {
-    "id": "de404b20-c4be-48b9-a013-9eb8d890d94a",
-    "origin": {
-      "city": "Denver",
-      "state": "CO"
-    },
-    "destination": {
-      "city": "Atlanta",
-      "state": "GA"
-    },
-    "pickup_start": "2025-12-23T01:04:53.961651Z",
-    "pickup_end": "2025-12-23T09:04:53.961651Z",
-    "delivery_start": "2025-12-25T06:04:53.961651Z",
-    "delivery_end": "2025-12-25T16:04:53.961651Z",
-    "equipment": "Reefer",
-    "weight_lbs": 17334,
-    "hazmat": false,
-    "distance_miles": 1439.0,
-    "deadhead_miles": 97.0,
-    "rate_total_usd": 3498.5,
-    "rpm": 2.431,
-    "broker": {
-      "name": "Evergreen Transport",
-      "rating": 4.1
-    },
-    "detention": true,
-    "multi_stop": true,
-    "lane_history": true,
-    "commodity": "Building Materials",
-    "posted_at": "2025-12-19T08:04:53.961651Z",
-    "updated_at": "2025-12-20T00:50:53.961651Z"
-  },
-  {
-    "id": "42f8ce78-8d47-4376-b785-cd31077d613f",
-    "origin": {
-      "city": "Denver",
-      "state": "CO"
-    },
-    "destination": {
-      "city": "Los Angeles",
-      "state": "CA"
-    },
-    "pickup_start": "2025-12-22T08:04:53.961651Z",
-    "pickup_end": "2025-12-22T13:04:53.961651Z",
-    "delivery_start": "2025-12-23T11:04:53.961651Z",
-    "delivery_end": "2025-12-23T15:04:53.961651Z",
-    "equipment": "Reefer",
-    "weight_lbs": 11697,
-    "hazmat": false,
-    "distance_miles": 999.0,
-    "deadhead_miles": 229.0,
-    "rate_total_usd": 2858.33,
-    "rpm": 2.861,
-    "broker": {
-      "name": "Evergreen Transport",
-      "rating": 3.1
-    },
-    "detention": false,
-    "multi_stop": true,
     "lane_history": false,
-    "commodity": "Paper",
-    "posted_at": "2025-12-18T18:04:53.961651Z",
-    "updated_at": "2025-12-20T02:16:53.961651Z"
+    "commodity": "Food",
+    "posted_at": "2025-12-18T19:29:42.173777Z",
+    "updated_at": "2025-12-20T02:48:42.173777Z"
   },
   {
-    "id": "4d3df31a-2625-4f78-86ba-c7ec50e39794",
+    "id": "ed02e661-8318-4fe6-8101-93b593534946",
     "origin": {
       "city": "Dallas",
       "state": "TX"
@@ -105,698 +265,538 @@
       "city": "Phoenix",
       "state": "AZ"
     },
-    "pickup_start": "2025-12-22T09:04:53.961651Z",
-    "pickup_end": "2025-12-22T14:04:53.961651Z",
-    "delivery_start": "2025-12-22T22:04:53.961651Z",
-    "delivery_end": "2025-12-23T02:04:53.961651Z",
+    "pickup_start": "2025-12-20T07:29:42.173777Z",
+    "pickup_end": "2025-12-20T15:29:42.173777Z",
+    "delivery_start": "2025-12-22T01:29:42.173777Z",
+    "delivery_end": "2025-12-22T07:29:42.173777Z",
     "equipment": "Dry Van",
-    "weight_lbs": 32737,
+    "weight_lbs": 33776,
     "hazmat": false,
-    "distance_miles": 1700.0,
-    "deadhead_miles": 55.0,
-    "rate_total_usd": 4709.43,
-    "rpm": 2.77,
+    "distance_miles": 1390.0,
+    "deadhead_miles": 63.0,
+    "rate_total_usd": 3424.02,
+    "rpm": 2.463,
+    "broker": {
+      "name": "Delta Carrier Services",
+      "rating": 4.2
+    },
+    "detention": false,
+    "multi_stop": true,
+    "lane_history": false,
+    "commodity": "Food",
+    "posted_at": "2025-12-19T11:29:42.173777Z",
+    "updated_at": "2025-12-20T04:25:42.173777Z"
+  },
+  {
+    "id": "bc2bb21a-7da1-4ef9-af7e-b4d6e3e0b829",
+    "origin": {
+      "city": "Salt Lake City",
+      "state": "UT"
+    },
+    "destination": {
+      "city": "Miami",
+      "state": "FL"
+    },
+    "pickup_start": "2025-12-21T08:29:42.173777Z",
+    "pickup_end": "2025-12-21T16:29:42.173777Z",
+    "delivery_start": "2025-12-23T11:29:42.173777Z",
+    "delivery_end": "2025-12-23T18:29:42.173777Z",
+    "equipment": "Reefer",
+    "weight_lbs": 43392,
+    "hazmat": false,
+    "distance_miles": 1234.0,
+    "deadhead_miles": 239.0,
+    "rate_total_usd": 4024.86,
+    "rpm": 3.262,
+    "broker": {
+      "name": "Evergreen Transport",
+      "rating": 4.1
+    },
+    "detention": false,
+    "multi_stop": true,
+    "lane_history": false,
+    "commodity": "Chemicals",
+    "posted_at": "2025-12-19T20:29:42.173777Z",
+    "updated_at": "2025-12-20T03:26:42.173777Z"
+  },
+  {
+    "id": "f96a2043-a528-4e57-bc1b-0746ecb54a86",
+    "origin": {
+      "city": "Kansas City",
+      "state": "MO"
+    },
+    "destination": {
+      "city": "Los Angeles",
+      "state": "CA"
+    },
+    "pickup_start": "2025-12-22T17:29:42.173777Z",
+    "pickup_end": "2025-12-22T19:29:42.173777Z",
+    "delivery_start": "2025-12-23T09:29:42.173777Z",
+    "delivery_end": "2025-12-23T11:29:42.173777Z",
+    "equipment": "Flatbed",
+    "weight_lbs": 9601,
+    "hazmat": false,
+    "distance_miles": 1031.0,
+    "deadhead_miles": 2.0,
+    "rate_total_usd": 1702.04,
+    "rpm": 1.651,
+    "broker": {
+      "name": "Evergreen Transport",
+      "rating": 4.4
+    },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": true,
+    "commodity": "Automotive",
+    "posted_at": "2025-12-18T17:29:42.173777Z",
+    "updated_at": "2025-12-20T04:22:42.173777Z"
+  },
+  {
+    "id": "781238a2-33c8-4a76-ba01-6af6dc8b6273",
+    "origin": {
+      "city": "Nashville",
+      "state": "TN"
+    },
+    "destination": {
+      "city": "Salt Lake City",
+      "state": "UT"
+    },
+    "pickup_start": "2025-12-20T13:29:42.173777Z",
+    "pickup_end": "2025-12-20T23:29:42.173777Z",
+    "delivery_start": "2025-12-23T05:29:42.173777Z",
+    "delivery_end": "2025-12-23T09:29:42.173777Z",
+    "equipment": "Dry Van",
+    "weight_lbs": 27816,
+    "hazmat": false,
+    "distance_miles": 1909.0,
+    "deadhead_miles": 10.0,
+    "rate_total_usd": 5162.58,
+    "rpm": 2.704,
+    "broker": {
+      "name": "Delta Carrier Services",
+      "rating": 3.1
+    },
+    "detention": true,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "General Freight",
+    "posted_at": "2025-12-19T07:29:42.173777Z",
+    "updated_at": "2025-12-20T01:55:42.173777Z"
+  },
+  {
+    "id": "f8d35b0c-fa98-4341-8724-752e46a86f06",
+    "origin": {
+      "city": "New York",
+      "state": "NY"
+    },
+    "destination": {
+      "city": "Nashville",
+      "state": "TN"
+    },
+    "pickup_start": "2025-12-21T21:29:42.173777Z",
+    "pickup_end": "2025-12-21T23:29:42.173777Z",
+    "delivery_start": "2025-12-24T04:29:42.173777Z",
+    "delivery_end": "2025-12-24T06:29:42.173777Z",
+    "equipment": "Reefer",
+    "weight_lbs": 7978,
+    "hazmat": true,
+    "distance_miles": 501.0,
+    "deadhead_miles": 56.0,
+    "rate_total_usd": 1829.85,
+    "rpm": 3.652,
+    "broker": {
+      "name": "Evergreen Transport",
+      "rating": 4.0
+    },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "Food",
+    "posted_at": "2025-12-18T10:29:42.173777Z",
+    "updated_at": "2025-12-20T04:16:42.173777Z"
+  },
+  {
+    "id": "a8833149-65ee-4021-a49a-b172010ec9dc",
+    "origin": {
+      "city": "Dallas",
+      "state": "TX"
+    },
+    "destination": {
+      "city": "Nashville",
+      "state": "TN"
+    },
+    "pickup_start": "2025-12-22T15:29:42.173777Z",
+    "pickup_end": "2025-12-22T17:29:42.173777Z",
+    "delivery_start": "2025-12-23T03:29:42.173777Z",
+    "delivery_end": "2025-12-23T07:29:42.173777Z",
+    "equipment": "Power Only",
+    "weight_lbs": 10982,
+    "hazmat": false,
+    "distance_miles": 1929.0,
+    "deadhead_miles": 238.0,
+    "rate_total_usd": 6033.81,
+    "rpm": 3.128,
+    "broker": {
+      "name": "Canyon Freight",
+      "rating": 3.9
+    },
+    "detention": false,
+    "multi_stop": true,
+    "lane_history": false,
+    "commodity": "Paper",
+    "posted_at": "2025-12-19T09:29:42.173777Z",
+    "updated_at": "2025-12-20T04:01:42.173777Z"
+  },
+  {
+    "id": "43f1f310-12f8-4aac-a144-744142299390",
+    "origin": {
+      "city": "Los Angeles",
+      "state": "CA"
+    },
+    "destination": {
+      "city": "Dallas",
+      "state": "TX"
+    },
+    "pickup_start": "2025-12-21T17:29:42.173777Z",
+    "pickup_end": "2025-12-22T02:29:42.173777Z",
+    "delivery_start": "2025-12-23T21:29:42.173777Z",
+    "delivery_end": "2025-12-24T02:29:42.173777Z",
+    "equipment": "Power Only",
+    "weight_lbs": 40534,
+    "hazmat": false,
+    "distance_miles": 1657.0,
+    "deadhead_miles": 4.0,
+    "rate_total_usd": 3983.86,
+    "rpm": 2.404,
     "broker": {
       "name": "Bluebird Brokerage",
+      "rating": 3.7
+    },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "Building Materials",
+    "posted_at": "2025-12-18T23:29:42.173777Z",
+    "updated_at": "2025-12-20T04:21:42.173777Z"
+  },
+  {
+    "id": "1044adc7-9c5c-4ed2-aac9-69466cdee517",
+    "origin": {
+      "city": "Nashville",
+      "state": "TN"
+    },
+    "destination": {
+      "city": "Dallas",
+      "state": "TX"
+    },
+    "pickup_start": "2025-12-22T18:29:42.173777Z",
+    "pickup_end": "2025-12-23T04:29:42.173777Z",
+    "delivery_start": "2025-12-23T23:29:42.173777Z",
+    "delivery_end": "2025-12-24T03:29:42.173777Z",
+    "equipment": "Power Only",
+    "weight_lbs": 24674,
+    "hazmat": false,
+    "distance_miles": 1745.0,
+    "deadhead_miles": 105.0,
+    "rate_total_usd": 5341.93,
+    "rpm": 3.061,
+    "broker": {
+      "name": "Evergreen Transport",
       "rating": 3.0
     },
     "detention": false,
     "multi_stop": false,
-    "lane_history": false,
+    "lane_history": true,
     "commodity": "Automotive",
-    "posted_at": "2025-12-18T21:04:53.961651Z",
-    "updated_at": "2025-12-20T01:38:53.961651Z"
+    "posted_at": "2025-12-18T08:29:42.173777Z",
+    "updated_at": "2025-12-20T01:35:42.173777Z"
   },
   {
-    "id": "fa9955d6-364a-4ff0-9bb9-d3a26a86c573",
+    "id": "79ee595b-40c8-4e6f-9279-a2d462e480be",
     "origin": {
+      "city": "Salt Lake City",
+      "state": "UT"
+    },
+    "destination": {
       "city": "Los Angeles",
       "state": "CA"
     },
-    "destination": {
-      "city": "Seattle",
-      "state": "WA"
-    },
-    "pickup_start": "2025-12-20T20:04:53.961651Z",
-    "pickup_end": "2025-12-21T05:04:53.961651Z",
-    "delivery_start": "2025-12-22T00:04:53.961651Z",
-    "delivery_end": "2025-12-22T05:04:53.961651Z",
-    "equipment": "Flatbed",
-    "weight_lbs": 18641,
-    "hazmat": false,
-    "distance_miles": 588.0,
-    "deadhead_miles": 181.0,
-    "rate_total_usd": 1945.44,
-    "rpm": 3.309,
-    "broker": {
-      "name": "Acme Logistics",
-      "rating": 2.9
-    },
-    "detention": false,
-    "multi_stop": true,
-    "lane_history": false,
-    "commodity": "Automotive",
-    "posted_at": "2025-12-19T12:04:53.961651Z",
-    "updated_at": "2025-12-20T00:06:53.961651Z"
-  },
-  {
-    "id": "b61e50dd-ff5c-4563-a964-50be31068932",
-    "origin": {
-      "city": "Kansas City",
-      "state": "MO"
-    },
-    "destination": {
-      "city": "Atlanta",
-      "state": "GA"
-    },
-    "pickup_start": "2025-12-20T05:04:53.961651Z",
-    "pickup_end": "2025-12-20T15:04:53.961651Z",
-    "delivery_start": "2025-12-22T07:04:53.961651Z",
-    "delivery_end": "2025-12-22T13:04:53.961651Z",
-    "equipment": "Flatbed",
-    "weight_lbs": 26477,
-    "hazmat": false,
-    "distance_miles": 2182.0,
-    "deadhead_miles": 136.0,
-    "rate_total_usd": 6736.8,
-    "rpm": 3.087,
-    "broker": {
-      "name": "Delta Carrier Services",
-      "rating": 2.6
-    },
-    "detention": false,
-    "multi_stop": false,
-    "lane_history": false,
-    "commodity": "Paper",
-    "posted_at": "2025-12-19T19:04:53.961651Z",
-    "updated_at": "2025-12-20T00:36:53.961651Z"
-  },
-  {
-    "id": "558f91b2-e077-4227-916f-a80d4451c904",
-    "origin": {
-      "city": "Dallas",
-      "state": "TX"
-    },
-    "destination": {
-      "city": "Kansas City",
-      "state": "MO"
-    },
-    "pickup_start": "2025-12-21T06:04:53.961651Z",
-    "pickup_end": "2025-12-21T12:04:53.961651Z",
-    "delivery_start": "2025-12-23T13:04:53.961651Z",
-    "delivery_end": "2025-12-23T15:04:53.961651Z",
-    "equipment": "Reefer",
-    "weight_lbs": 34794,
-    "hazmat": false,
-    "distance_miles": 704.0,
-    "deadhead_miles": 111.0,
-    "rate_total_usd": 1839.87,
-    "rpm": 2.613,
-    "broker": {
-      "name": "Bluebird Brokerage",
-      "rating": 3.2
-    },
-    "detention": true,
-    "multi_stop": false,
-    "lane_history": false,
-    "commodity": "Chemicals",
-    "posted_at": "2025-12-19T09:04:53.961651Z",
-    "updated_at": "2025-12-20T00:58:53.961651Z"
-  },
-  {
-    "id": "1cdaf988-e38a-4a8c-a88e-5b77dfd6c656",
-    "origin": {
-      "city": "New York",
-      "state": "NY"
-    },
-    "destination": {
-      "city": "Dallas",
-      "state": "TX"
-    },
-    "pickup_start": "2025-12-21T12:04:53.961651Z",
-    "pickup_end": "2025-12-21T16:04:53.961651Z",
-    "delivery_start": "2025-12-23T20:04:53.961651Z",
-    "delivery_end": "2025-12-24T03:04:53.961651Z",
+    "pickup_start": "2025-12-22T11:29:42.173777Z",
+    "pickup_end": "2025-12-22T19:29:42.173777Z",
+    "delivery_start": "2025-12-24T09:29:42.173777Z",
+    "delivery_end": "2025-12-24T14:29:42.173777Z",
     "equipment": "Power Only",
-    "weight_lbs": 35046,
+    "weight_lbs": 31704,
     "hazmat": false,
-    "distance_miles": 1253.0,
-    "deadhead_miles": 46.0,
-    "rate_total_usd": 3267.58,
-    "rpm": 2.608,
-    "broker": {
-      "name": "Evergreen Transport",
-      "rating": 4.5
-    },
-    "detention": false,
-    "multi_stop": false,
-    "lane_history": false,
-    "commodity": "Automotive",
-    "posted_at": "2025-12-18T21:04:53.961651Z",
-    "updated_at": "2025-12-20T02:14:53.961651Z"
-  },
-  {
-    "id": "dac7309f-c84c-4ffe-90b0-441d36f367e9",
-    "origin": {
-      "city": "Miami",
-      "state": "FL"
-    },
-    "destination": {
-      "city": "Los Angeles",
-      "state": "CA"
-    },
-    "pickup_start": "2025-12-22T07:04:53.961651Z",
-    "pickup_end": "2025-12-22T14:04:53.961651Z",
-    "delivery_start": "2025-12-24T08:04:53.961651Z",
-    "delivery_end": "2025-12-24T17:04:53.961651Z",
-    "equipment": "Reefer",
-    "weight_lbs": 26155,
-    "hazmat": false,
-    "distance_miles": 1626.0,
-    "deadhead_miles": 236.0,
-    "rate_total_usd": 3313.59,
-    "rpm": 2.038,
-    "broker": {
-      "name": "Evergreen Transport",
-      "rating": 4.1
-    },
-    "detention": false,
-    "multi_stop": false,
-    "lane_history": false,
-    "commodity": "General Freight",
-    "posted_at": "2025-12-19T02:04:53.961651Z",
-    "updated_at": "2025-12-20T00:55:53.961651Z"
-  },
-  {
-    "id": "cc02f8f5-d8bc-4389-9c0c-8f6735982c09",
-    "origin": {
-      "city": "Los Angeles",
-      "state": "CA"
-    },
-    "destination": {
-      "city": "Denver",
-      "state": "CO"
-    },
-    "pickup_start": "2025-12-22T05:04:53.961651Z",
-    "pickup_end": "2025-12-22T15:04:53.961651Z",
-    "delivery_start": "2025-12-25T00:04:53.961651Z",
-    "delivery_end": "2025-12-25T02:04:53.961651Z",
-    "equipment": "Flatbed",
-    "weight_lbs": 12967,
-    "hazmat": false,
-    "distance_miles": 926.0,
+    "distance_miles": 1058.0,
     "deadhead_miles": 205.0,
-    "rate_total_usd": 1722.84,
-    "rpm": 1.861,
-    "broker": {
-      "name": "Evergreen Transport",
-      "rating": 2.7
-    },
-    "detention": false,
-    "multi_stop": false,
-    "lane_history": false,
-    "commodity": "Food",
-    "posted_at": "2025-12-19T19:04:53.961651Z",
-    "updated_at": "2025-12-20T02:54:53.961651Z"
-  },
-  {
-    "id": "22517b8e-f4c0-4297-89f8-030ce5db3702",
-    "origin": {
-      "city": "Salt Lake City",
-      "state": "UT"
-    },
-    "destination": {
-      "city": "Denver",
-      "state": "CO"
-    },
-    "pickup_start": "2025-12-21T13:04:53.961651Z",
-    "pickup_end": "2025-12-21T19:04:53.961651Z",
-    "delivery_start": "2025-12-23T10:04:53.961651Z",
-    "delivery_end": "2025-12-23T13:04:53.961651Z",
-    "equipment": "Flatbed",
-    "weight_lbs": 22479,
-    "hazmat": false,
-    "distance_miles": 185.0,
-    "deadhead_miles": 69.0,
-    "rate_total_usd": 333.12,
-    "rpm": 1.801,
-    "broker": {
-      "name": "Evergreen Transport",
-      "rating": 4.4
-    },
-    "detention": false,
-    "multi_stop": false,
-    "lane_history": false,
-    "commodity": "Paper",
-    "posted_at": "2025-12-19T20:04:53.961651Z",
-    "updated_at": "2025-12-20T01:26:53.961651Z"
-  },
-  {
-    "id": "b13e9637-9be0-41fc-b600-de90fdc81324",
-    "origin": {
-      "city": "Chicago",
-      "state": "IL"
-    },
-    "destination": {
-      "city": "Kansas City",
-      "state": "MO"
-    },
-    "pickup_start": "2025-12-22T22:04:53.961651Z",
-    "pickup_end": "2025-12-23T05:04:53.961651Z",
-    "delivery_start": "2025-12-25T05:04:53.961651Z",
-    "delivery_end": "2025-12-25T10:04:53.961651Z",
-    "equipment": "Power Only",
-    "weight_lbs": 33503,
-    "hazmat": false,
-    "distance_miles": 785.0,
-    "deadhead_miles": 127.0,
-    "rate_total_usd": 1702.81,
-    "rpm": 2.169,
-    "broker": {
-      "name": "Evergreen Transport",
-      "rating": 2.6
-    },
-    "detention": false,
-    "multi_stop": false,
-    "lane_history": true,
-    "commodity": "Chemicals",
-    "posted_at": "2025-12-18T14:04:53.961651Z",
-    "updated_at": "2025-12-20T02:42:53.961651Z"
-  },
-  {
-    "id": "79dd47d2-c5c0-46ee-8555-1ce1d89bd4fa",
-    "origin": {
-      "city": "Atlanta",
-      "state": "GA"
-    },
-    "destination": {
-      "city": "Denver",
-      "state": "CO"
-    },
-    "pickup_start": "2025-12-22T15:04:53.961651Z",
-    "pickup_end": "2025-12-22T17:04:53.961651Z",
-    "delivery_start": "2025-12-23T13:04:53.961651Z",
-    "delivery_end": "2025-12-23T19:04:53.961651Z",
-    "equipment": "Dry Van",
-    "weight_lbs": 45584,
-    "hazmat": false,
-    "distance_miles": 1514.0,
-    "deadhead_miles": 213.0,
-    "rate_total_usd": 3946.65,
-    "rpm": 2.607,
-    "broker": {
-      "name": "Delta Carrier Services",
-      "rating": 3.6
-    },
-    "detention": false,
-    "multi_stop": false,
-    "lane_history": true,
-    "commodity": "Chemicals",
-    "posted_at": "2025-12-19T00:04:53.961651Z",
-    "updated_at": "2025-12-20T00:35:53.961651Z"
-  },
-  {
-    "id": "77c702f3-cc02-4215-b88e-9a1204883bb0",
-    "origin": {
-      "city": "Los Angeles",
-      "state": "CA"
-    },
-    "destination": {
-      "city": "New York",
-      "state": "NY"
-    },
-    "pickup_start": "2025-12-22T13:04:53.961651Z",
-    "pickup_end": "2025-12-22T17:04:53.961651Z",
-    "delivery_start": "2025-12-23T06:04:53.961651Z",
-    "delivery_end": "2025-12-23T11:04:53.961651Z",
-    "equipment": "Flatbed",
-    "weight_lbs": 13258,
-    "hazmat": false,
-    "distance_miles": 831.0,
-    "deadhead_miles": 64.0,
-    "rate_total_usd": 1536.35,
-    "rpm": 1.849,
-    "broker": {
-      "name": "Acme Logistics",
-      "rating": 2.7
-    },
-    "detention": false,
-    "multi_stop": true,
-    "lane_history": false,
-    "commodity": "General Freight",
-    "posted_at": "2025-12-19T08:04:53.961651Z",
-    "updated_at": "2025-12-20T01:10:53.961651Z"
-  },
-  {
-    "id": "6541565d-6ed4-4ca2-8e14-aa4ec3cdfb7b",
-    "origin": {
-      "city": "Denver",
-      "state": "CO"
-    },
-    "destination": {
-      "city": "Kansas City",
-      "state": "MO"
-    },
-    "pickup_start": "2025-12-22T21:04:53.961651Z",
-    "pickup_end": "2025-12-23T02:04:53.961651Z",
-    "delivery_start": "2025-12-23T23:04:53.961651Z",
-    "delivery_end": "2025-12-24T05:04:53.961651Z",
-    "equipment": "Dry Van",
-    "weight_lbs": 37359,
-    "hazmat": false,
-    "distance_miles": 1427.0,
-    "deadhead_miles": 118.0,
-    "rate_total_usd": 3558.76,
-    "rpm": 2.494,
-    "broker": {
-      "name": "Evergreen Transport",
-      "rating": 3.3
-    },
-    "detention": true,
-    "multi_stop": false,
-    "lane_history": false,
-    "commodity": "Chemicals",
-    "posted_at": "2025-12-18T12:04:53.961651Z",
-    "updated_at": "2025-12-20T01:11:53.961651Z"
-  },
-  {
-    "id": "3b31c69e-6a57-4fd8-a7b6-107f717dc9b3",
-    "origin": {
-      "city": "Seattle",
-      "state": "WA"
-    },
-    "destination": {
-      "city": "Nashville",
-      "state": "TN"
-    },
-    "pickup_start": "2025-12-22T02:04:53.961651Z",
-    "pickup_end": "2025-12-22T09:04:53.961651Z",
-    "delivery_start": "2025-12-22T19:04:53.961651Z",
-    "delivery_end": "2025-12-22T21:04:53.961651Z",
-    "equipment": "Dry Van",
-    "weight_lbs": 42508,
-    "hazmat": false,
-    "distance_miles": 2021.0,
-    "deadhead_miles": 96.0,
-    "rate_total_usd": 4741.54,
-    "rpm": 2.346,
-    "broker": {
-      "name": "Acme Logistics",
-      "rating": 4.9
-    },
-    "detention": false,
-    "multi_stop": false,
-    "lane_history": false,
-    "commodity": "Food",
-    "posted_at": "2025-12-18T13:04:53.961651Z",
-    "updated_at": "2025-12-20T01:39:53.961651Z"
-  },
-  {
-    "id": "702d214a-69a8-4fd0-84bf-a5fff554b785",
-    "origin": {
-      "city": "Salt Lake City",
-      "state": "UT"
-    },
-    "destination": {
-      "city": "Dallas",
-      "state": "TX"
-    },
-    "pickup_start": "2025-12-21T19:04:53.961651Z",
-    "pickup_end": "2025-12-22T00:04:53.961651Z",
-    "delivery_start": "2025-12-23T14:04:53.961651Z",
-    "delivery_end": "2025-12-23T23:04:53.961651Z",
-    "equipment": "Reefer",
-    "weight_lbs": 17675,
-    "hazmat": false,
-    "distance_miles": 1263.0,
-    "deadhead_miles": 249.0,
-    "rate_total_usd": 4392.24,
-    "rpm": 3.478,
-    "broker": {
-      "name": "Bluebird Brokerage",
-      "rating": 4.4
-    },
-    "detention": false,
-    "multi_stop": false,
-    "lane_history": true,
-    "commodity": "Paper",
-    "posted_at": "2025-12-19T13:04:53.961651Z",
-    "updated_at": "2025-12-20T01:27:53.961651Z"
-  },
-  {
-    "id": "b3d09663-261c-4144-b61b-0ecda7ea2426",
-    "origin": {
-      "city": "Seattle",
-      "state": "WA"
-    },
-    "destination": {
-      "city": "Atlanta",
-      "state": "GA"
-    },
-    "pickup_start": "2025-12-22T12:04:53.961651Z",
-    "pickup_end": "2025-12-22T15:04:53.961651Z",
-    "delivery_start": "2025-12-24T22:04:53.961651Z",
-    "delivery_end": "2025-12-25T06:04:53.961651Z",
-    "equipment": "Power Only",
-    "weight_lbs": 16434,
-    "hazmat": false,
-    "distance_miles": 759.0,
-    "deadhead_miles": 198.0,
-    "rate_total_usd": 2239.77,
-    "rpm": 2.951,
-    "broker": {
-      "name": "Acme Logistics",
-      "rating": 4.8
-    },
-    "detention": true,
-    "multi_stop": false,
-    "lane_history": false,
-    "commodity": "Building Materials",
-    "posted_at": "2025-12-19T00:04:53.961651Z",
-    "updated_at": "2025-12-20T02:41:53.961651Z"
-  },
-  {
-    "id": "ed3206b9-db45-4790-b0a1-f2209260b18b",
-    "origin": {
-      "city": "Nashville",
-      "state": "TN"
-    },
-    "destination": {
-      "city": "Kansas City",
-      "state": "MO"
-    },
-    "pickup_start": "2025-12-22T06:04:53.961651Z",
-    "pickup_end": "2025-12-22T08:04:53.961651Z",
-    "delivery_start": "2025-12-23T03:04:53.961651Z",
-    "delivery_end": "2025-12-23T10:04:53.961651Z",
-    "equipment": "Flatbed",
-    "weight_lbs": 22318,
-    "hazmat": false,
-    "distance_miles": 795.0,
-    "deadhead_miles": 17.0,
-    "rate_total_usd": 2114.55,
-    "rpm": 2.66,
-    "broker": {
-      "name": "Acme Logistics",
-      "rating": 3.2
-    },
-    "detention": true,
-    "multi_stop": false,
-    "lane_history": true,
-    "commodity": "Automotive",
-    "posted_at": "2025-12-19T16:04:53.961651Z",
-    "updated_at": "2025-12-20T01:38:53.961651Z"
-  },
-  {
-    "id": "64831e94-f074-40c9-8368-62d1c209bbce",
-    "origin": {
-      "city": "Miami",
-      "state": "FL"
-    },
-    "destination": {
-      "city": "Phoenix",
-      "state": "AZ"
-    },
-    "pickup_start": "2025-12-21T06:04:53.961651Z",
-    "pickup_end": "2025-12-21T09:04:53.961651Z",
-    "delivery_start": "2025-12-22T02:04:53.961651Z",
-    "delivery_end": "2025-12-22T07:04:53.961651Z",
-    "equipment": "Dry Van",
-    "weight_lbs": 23840,
-    "hazmat": false,
-    "distance_miles": 1269.0,
-    "deadhead_miles": 241.0,
-    "rate_total_usd": 4142.12,
-    "rpm": 3.264,
-    "broker": {
-      "name": "Acme Logistics",
-      "rating": 2.8
-    },
-    "detention": false,
-    "multi_stop": false,
-    "lane_history": true,
-    "commodity": "Paper",
-    "posted_at": "2025-12-19T16:04:53.961651Z",
-    "updated_at": "2025-12-20T01:54:53.961651Z"
-  },
-  {
-    "id": "3e978d3d-bdd5-42d2-a282-c7d292eaedbb",
-    "origin": {
-      "city": "Dallas",
-      "state": "TX"
-    },
-    "destination": {
-      "city": "New York",
-      "state": "NY"
-    },
-    "pickup_start": "2025-12-22T12:04:53.961651Z",
-    "pickup_end": "2025-12-22T17:04:53.961651Z",
-    "delivery_start": "2025-12-23T16:04:53.961651Z",
-    "delivery_end": "2025-12-23T19:04:53.961651Z",
-    "equipment": "Dry Van",
-    "weight_lbs": 7231,
-    "hazmat": false,
-    "distance_miles": 1380.0,
-    "deadhead_miles": 72.0,
-    "rate_total_usd": 3947.2,
-    "rpm": 2.86,
+    "rate_total_usd": 3171.06,
+    "rpm": 2.997,
     "broker": {
       "name": "Evergreen Transport",
       "rating": 3.8
     },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "General Freight",
+    "posted_at": "2025-12-19T15:29:42.173777Z",
+    "updated_at": "2025-12-20T02:26:42.173777Z"
+  },
+  {
+    "id": "07e17c29-51c4-44cd-9d7d-654d07872143",
+    "origin": {
+      "city": "Nashville",
+      "state": "TN"
+    },
+    "destination": {
+      "city": "Dallas",
+      "state": "TX"
+    },
+    "pickup_start": "2025-12-22T01:29:42.173777Z",
+    "pickup_end": "2025-12-22T07:29:42.173777Z",
+    "delivery_start": "2025-12-23T19:29:42.173777Z",
+    "delivery_end": "2025-12-24T03:29:42.173777Z",
+    "equipment": "Power Only",
+    "weight_lbs": 23509,
+    "hazmat": false,
+    "distance_miles": 2033.0,
+    "deadhead_miles": 193.0,
+    "rate_total_usd": 6564.6,
+    "rpm": 3.229,
+    "broker": {
+      "name": "Acme Logistics",
+      "rating": 2.6
+    },
     "detention": true,
     "multi_stop": false,
     "lane_history": false,
     "commodity": "Building Materials",
-    "posted_at": "2025-12-18T20:04:53.961651Z",
-    "updated_at": "2025-12-20T02:31:53.961651Z"
+    "posted_at": "2025-12-18T06:29:42.173777Z",
+    "updated_at": "2025-12-20T04:17:42.173777Z"
   },
   {
-    "id": "bd073fab-2c9f-4da6-9e38-37b8a8dd7e47",
+    "id": "faf4896d-3030-4a09-a632-a60b27a43e2c",
     "origin": {
-      "city": "Chicago",
-      "state": "IL"
+      "city": "Nashville",
+      "state": "TN"
     },
     "destination": {
-      "city": "Phoenix",
-      "state": "AZ"
-    },
-    "pickup_start": "2025-12-23T00:04:53.961651Z",
-    "pickup_end": "2025-12-23T08:04:53.961651Z",
-    "delivery_start": "2025-12-25T04:04:53.961651Z",
-    "delivery_end": "2025-12-25T09:04:53.961651Z",
-    "equipment": "Dry Van",
-    "weight_lbs": 16972,
-    "hazmat": false,
-    "distance_miles": 222.0,
-    "deadhead_miles": 221.0,
-    "rate_total_usd": 485.11,
-    "rpm": 2.185,
-    "broker": {
-      "name": "Canyon Freight",
-      "rating": 3.2
-    },
-    "detention": true,
-    "multi_stop": false,
-    "lane_history": false,
-    "commodity": "General Freight",
-    "posted_at": "2025-12-19T19:04:53.961651Z",
-    "updated_at": "2025-12-20T02:51:53.961651Z"
-  },
-  {
-    "id": "63d795bb-55e2-4e2f-b3a6-11aebd0d41bd",
-    "origin": {
       "city": "Kansas City",
       "state": "MO"
     },
-    "destination": {
-      "city": "Los Angeles",
-      "state": "CA"
-    },
-    "pickup_start": "2025-12-22T00:04:53.961651Z",
-    "pickup_end": "2025-12-22T06:04:53.961651Z",
-    "delivery_start": "2025-12-23T15:04:53.961651Z",
-    "delivery_end": "2025-12-23T18:04:53.961651Z",
-    "equipment": "Power Only",
-    "weight_lbs": 38909,
-    "hazmat": false,
-    "distance_miles": 433.0,
-    "deadhead_miles": 31.0,
-    "rate_total_usd": 1203.23,
-    "rpm": 2.779,
-    "broker": {
-      "name": "Delta Carrier Services",
-      "rating": 2.9
-    },
-    "detention": true,
-    "multi_stop": true,
-    "lane_history": false,
-    "commodity": "General Freight",
-    "posted_at": "2025-12-18T20:04:53.961651Z",
-    "updated_at": "2025-12-20T01:34:53.961651Z"
-  },
-  {
-    "id": "b329dabe-4d78-4f1f-8cb7-cc56096f063e",
-    "origin": {
-      "city": "Seattle",
-      "state": "WA"
-    },
-    "destination": {
-      "city": "Atlanta",
-      "state": "GA"
-    },
-    "pickup_start": "2025-12-20T17:04:53.961651Z",
-    "pickup_end": "2025-12-21T03:04:53.961651Z",
-    "delivery_start": "2025-12-22T00:04:53.961651Z",
-    "delivery_end": "2025-12-22T08:04:53.961651Z",
-    "equipment": "Reefer",
-    "weight_lbs": 31924,
-    "hazmat": false,
-    "distance_miles": 1083.0,
-    "deadhead_miles": 196.0,
-    "rate_total_usd": 3735.02,
-    "rpm": 3.449,
-    "broker": {
-      "name": "Canyon Freight",
-      "rating": 3.0
-    },
-    "detention": false,
-    "multi_stop": true,
-    "lane_history": false,
-    "commodity": "Building Materials",
-    "posted_at": "2025-12-19T02:04:53.961651Z",
-    "updated_at": "2025-12-20T02:30:53.961651Z"
-  },
-  {
-    "id": "cb4431ee-bd5e-4b11-a51a-a3a46d77ab8c",
-    "origin": {
-      "city": "Atlanta",
-      "state": "GA"
-    },
-    "destination": {
-      "city": "Miami",
-      "state": "FL"
-    },
-    "pickup_start": "2025-12-21T10:04:53.961651Z",
-    "pickup_end": "2025-12-21T14:04:53.961651Z",
-    "delivery_start": "2025-12-22T12:04:53.961651Z",
-    "delivery_end": "2025-12-22T15:04:53.961651Z",
+    "pickup_start": "2025-12-21T06:29:42.173777Z",
+    "pickup_end": "2025-12-21T08:29:42.173777Z",
+    "delivery_start": "2025-12-23T17:29:42.173777Z",
+    "delivery_end": "2025-12-24T00:29:42.173777Z",
     "equipment": "Flatbed",
-    "weight_lbs": 10956,
-    "hazmat": false,
-    "distance_miles": 611.0,
-    "deadhead_miles": 199.0,
-    "rate_total_usd": 1742.85,
-    "rpm": 2.852,
+    "weight_lbs": 38258,
+    "hazmat": true,
+    "distance_miles": 1522.0,
+    "deadhead_miles": 95.0,
+    "rate_total_usd": 5035.82,
+    "rpm": 3.309,
     "broker": {
-      "name": "Acme Logistics",
-      "rating": 3.4
+      "name": "Bluebird Brokerage",
+      "rating": 4.7
     },
     "detention": true,
     "multi_stop": false,
     "lane_history": false,
     "commodity": "Chemicals",
-    "posted_at": "2025-12-19T04:04:53.961651Z",
-    "updated_at": "2025-12-20T02:27:53.961651Z"
+    "posted_at": "2025-12-18T19:29:42.173777Z",
+    "updated_at": "2025-12-20T02:21:42.173777Z"
+  },
+  {
+    "id": "6755c2bc-28bd-427c-8686-9c8dcb53c97e",
+    "origin": {
+      "city": "Salt Lake City",
+      "state": "UT"
+    },
+    "destination": {
+      "city": "Phoenix",
+      "state": "AZ"
+    },
+    "pickup_start": "2025-12-22T23:29:42.173777Z",
+    "pickup_end": "2025-12-23T03:29:42.173777Z",
+    "delivery_start": "2025-12-24T10:29:42.173777Z",
+    "delivery_end": "2025-12-24T18:29:42.173777Z",
+    "equipment": "Reefer",
+    "weight_lbs": 16138,
+    "hazmat": false,
+    "distance_miles": 2135.0,
+    "deadhead_miles": 146.0,
+    "rate_total_usd": 4455.59,
+    "rpm": 2.087,
+    "broker": {
+      "name": "Bluebird Brokerage",
+      "rating": 2.6
+    },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "Chemicals",
+    "posted_at": "2025-12-20T02:29:42.173777Z",
+    "updated_at": "2025-12-20T02:25:42.173777Z"
+  },
+  {
+    "id": "7bf49608-197e-4707-b987-d0385e0f6d11",
+    "origin": {
+      "city": "Phoenix",
+      "state": "AZ"
+    },
+    "destination": {
+      "city": "Los Angeles",
+      "state": "CA"
+    },
+    "pickup_start": "2025-12-21T05:29:42.173777Z",
+    "pickup_end": "2025-12-21T14:29:42.173777Z",
+    "delivery_start": "2025-12-22T14:29:42.173777Z",
+    "delivery_end": "2025-12-22T20:29:42.173777Z",
+    "equipment": "Flatbed",
+    "weight_lbs": 41439,
+    "hazmat": false,
+    "distance_miles": 1096.0,
+    "deadhead_miles": 163.0,
+    "rate_total_usd": 2827.43,
+    "rpm": 2.58,
+    "broker": {
+      "name": "Delta Carrier Services",
+      "rating": 4.4
+    },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "General Freight",
+    "posted_at": "2025-12-18T06:29:42.173777Z",
+    "updated_at": "2025-12-20T03:47:42.173777Z"
+  },
+  {
+    "id": "159fc67c-4e5c-42f9-84a8-2ea6dbeaf6e2",
+    "origin": {
+      "city": "Atlanta",
+      "state": "GA"
+    },
+    "destination": {
+      "city": "New York",
+      "state": "NY"
+    },
+    "pickup_start": "2025-12-21T13:29:42.173777Z",
+    "pickup_end": "2025-12-21T22:29:42.173777Z",
+    "delivery_start": "2025-12-23T12:29:42.173777Z",
+    "delivery_end": "2025-12-23T16:29:42.173777Z",
+    "equipment": "Flatbed",
+    "weight_lbs": 13956,
+    "hazmat": false,
+    "distance_miles": 1054.0,
+    "deadhead_miles": 95.0,
+    "rate_total_usd": 2107.99,
+    "rpm": 2.0,
+    "broker": {
+      "name": "Acme Logistics",
+      "rating": 3.5
+    },
+    "detention": true,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "Food",
+    "posted_at": "2025-12-19T13:29:42.173777Z",
+    "updated_at": "2025-12-20T02:08:42.173777Z"
+  },
+  {
+    "id": "375bbac9-2186-4a13-bb2c-c72201e7e5a8",
+    "origin": {
+      "city": "Denver",
+      "state": "CO"
+    },
+    "destination": {
+      "city": "New York",
+      "state": "NY"
+    },
+    "pickup_start": "2025-12-21T15:29:42.173777Z",
+    "pickup_end": "2025-12-21T19:29:42.173777Z",
+    "delivery_start": "2025-12-24T06:29:42.173777Z",
+    "delivery_end": "2025-12-24T08:29:42.173777Z",
+    "equipment": "Dry Van",
+    "weight_lbs": 43338,
+    "hazmat": false,
+    "distance_miles": 1190.0,
+    "deadhead_miles": 181.0,
+    "rate_total_usd": 3418.8,
+    "rpm": 2.873,
+    "broker": {
+      "name": "Delta Carrier Services",
+      "rating": 2.6
+    },
+    "detention": false,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "Automotive",
+    "posted_at": "2025-12-19T16:29:42.173777Z",
+    "updated_at": "2025-12-20T03:45:42.173777Z"
+  },
+  {
+    "id": "6e99da89-1cd1-4b14-afad-3b561536a5bc",
+    "origin": {
+      "city": "Nashville",
+      "state": "TN"
+    },
+    "destination": {
+      "city": "Salt Lake City",
+      "state": "UT"
+    },
+    "pickup_start": "2025-12-23T02:29:42.173777Z",
+    "pickup_end": "2025-12-23T09:29:42.173777Z",
+    "delivery_start": "2025-12-24T08:29:42.173777Z",
+    "delivery_end": "2025-12-24T17:29:42.173777Z",
+    "equipment": "Flatbed",
+    "weight_lbs": 17091,
+    "hazmat": false,
+    "distance_miles": 865.0,
+    "deadhead_miles": 234.0,
+    "rate_total_usd": 2726.78,
+    "rpm": 3.152,
+    "broker": {
+      "name": "Delta Carrier Services",
+      "rating": 4.4
+    },
+    "detention": false,
+    "multi_stop": true,
+    "lane_history": true,
+    "commodity": "General Freight",
+    "posted_at": "2025-12-18T10:29:42.173777Z",
+    "updated_at": "2025-12-20T01:41:42.173777Z"
+  },
+  {
+    "id": "4603c955-54de-413e-a8fe-734430c2a275",
+    "origin": {
+      "city": "Los Angeles",
+      "state": "CA"
+    },
+    "destination": {
+      "city": "Phoenix",
+      "state": "AZ"
+    },
+    "pickup_start": "2025-12-21T10:29:42.173777Z",
+    "pickup_end": "2025-12-21T18:29:42.173777Z",
+    "delivery_start": "2025-12-23T15:29:42.173777Z",
+    "delivery_end": "2025-12-23T19:29:42.173777Z",
+    "equipment": "Reefer",
+    "weight_lbs": 14984,
+    "hazmat": false,
+    "distance_miles": 1182.0,
+    "deadhead_miles": 47.0,
+    "rate_total_usd": 3880.35,
+    "rpm": 3.283,
+    "broker": {
+      "name": "Canyon Freight",
+      "rating": 4.4
+    },
+    "detention": true,
+    "multi_stop": false,
+    "lane_history": false,
+    "commodity": "Chemicals",
+    "posted_at": "2025-12-20T01:29:42.173777Z",
+    "updated_at": "2025-12-20T03:53:42.173777Z"
   }
 ]

@@ -1411,3 +1411,139 @@ def redact_sensitive_data(log_entry: str) -> str:
 - Traces sampled to reduce data volume
 - Sensitive attributes excluded
 - Access controlled via Jaeger RBAC
+
+---
+
+## Scoring Validation Metrics
+
+Metrics for calibrating and monitoring GreenLight score quality. See [SCORING_CALIBRATION.md](SCORING_CALIBRATION.md) for methodology.
+
+### Outcome Correlation Metrics
+
+```yaml
+# Correlation between scores and user outcomes
+- name: freightlens_score_outcome_correlation
+  type: gauge
+  help: "Rolling 30-day Pearson r between GreenLight score and user satisfaction"
+  labels: [period]  # "7d", "30d", "90d"
+
+- name: freightlens_score_calibration_ece
+  type: gauge
+  help: "Expected Calibration Error for probability estimates"
+  labels: [estimate_type]  # "detention", "payment_delay", "fallthrough"
+
+- name: freightlens_score_ndcg
+  type: gauge
+  help: "NDCG for top-k surfaced loads"
+  labels: [k]  # "5", "10", "20"
+
+- name: freightlens_score_precision
+  type: gauge
+  help: "Precision for top-k loads (user rated ≥4 stars)"
+  labels: [k]  # "5", "10"
+```
+
+### Factor Validation Metrics
+
+```yaml
+# Per-factor correlation with ground truth
+- name: freightlens_factor_correlation
+  type: gauge
+  help: "Per-factor correlation with ground truth labels"
+  labels: [factor_name]  # "rpm", "broker_rating", "deadhead", "dwell_risk"
+
+- name: freightlens_factor_weight_current
+  type: gauge
+  help: "Current weight for each scoring factor"
+  labels: [factor_name]
+```
+
+### Drift Detection Metrics
+
+```yaml
+# Model/data drift indicators
+- name: freightlens_score_drift_kl_divergence
+  type: gauge
+  help: "KL divergence of score distribution vs. baseline"
+  labels: []
+
+- name: freightlens_factor_contribution_drift
+  type: gauge
+  help: "Change in mean factor contribution vs. baseline"
+  labels: [factor_name]
+```
+
+### Outcome Collection Metrics
+
+```yaml
+# User-provided label collection rates
+- name: freightlens_outcomes_collected_total
+  type: counter
+  help: "Count of user-provided outcome labels"
+  labels: [label_type]  # "satisfaction", "would_accept_again", "fallthrough", "financial"
+
+- name: freightlens_outcome_label_rate
+  type: gauge
+  help: "Percentage of accepted loads with outcome labels (7-day rolling)"
+  labels: []
+```
+
+### Confidence Distribution Metrics
+
+```yaml
+# Trust/confidence signal distribution
+- name: freightlens_confidence_bucket_distribution
+  type: histogram
+  help: "Distribution of loads by confidence bucket"
+  labels: [bucket]  # "high", "medium", "low"
+
+- name: freightlens_missing_field_rate
+  type: gauge
+  help: "Percentage of loads missing each critical field"
+  labels: [field_name]  # "rate", "distance", "broker_rating", "facility_id"
+
+- name: freightlens_freshness_bucket_distribution
+  type: histogram
+  help: "Distribution of loads by freshness bucket"
+  labels: [bucket]  # "fresh", "recent", "stale", "expired"
+```
+
+### Validation Alerting Rules
+
+```yaml
+# Alertmanager rules for scoring degradation
+groups:
+  - name: scoring_validation
+    rules:
+      - alert: ScoreOutcomeCorrelationLow
+        expr: freightlens_score_outcome_correlation{period="30d"} < 0.4
+        for: 24h
+        labels:
+          severity: warning
+        annotations:
+          summary: "GreenLight score correlation with user outcomes dropped below 0.4"
+          
+      - alert: CalibrationDrift
+        expr: freightlens_score_calibration_ece > 0.15
+        for: 12h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Probability calibration error exceeded 0.15"
+          
+      - alert: ScoreDistributionDrift
+        expr: freightlens_score_drift_kl_divergence > 0.2
+        for: 6h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Score distribution has drifted significantly from baseline"
+          
+      - alert: OutcomeLabelRateLow
+        expr: freightlens_outcome_label_rate < 0.05
+        for: 7d
+        labels:
+          severity: info
+        annotations:
+          summary: "Less than 5% of accepted loads have outcome labels"
+```

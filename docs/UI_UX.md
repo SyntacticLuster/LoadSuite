@@ -799,3 +799,35 @@ Power users can access any action via command palette (`Ctrl+K` or `Cmd+K`):
 - Offline load viewing
 - Location-based recommendations
 - Voice commands for hands-free operation
+
+---
+
+## Trust & Confidence Display
+
+Inline trust indicators throughout the UI. See [TRUST_UI_SPEC.md](TRUST_UI_SPEC.md) for complete specification.
+
+### Summary of Trust Primitives
+
+| Element | List View | Detail Panel | Exports |
+|---------|-----------|--------------|---------|
+| Confidence bucket | Colored dot (🟢🟡🔴) | Score + bucket + breakdown | Included as column |
+| Freshness | Age badge if stale/expired | Timestamp + bucket | Included as column |
+| Provenance | — | Source badge + name | Included as column |
+| Rights state | Restricted icon if applicable | Full rights display | Restricted fields excluded |
+
+### Interaction Summary
+
+- **Hover confidence indicator:** Shows "Why this confidence" tooltip (500ms delay)
+- **Click score factor:** Opens contribution detail popover
+- **Restricted export:** Button disabled with explanatory tooltip
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `c` | Toggle confidence column visibility |
+| `?` | Open "Why this score" for focused load |
+
+### Acceptance Criteria Reference
+
+See [TRUST_UI_SPEC.md#g-acceptance-criteria](TRUST_UI_SPEC.md#g-acceptance-criteria) for 30 testable acceptance criteria covering list view, detail panel, API contract, accessibility, and performance.
