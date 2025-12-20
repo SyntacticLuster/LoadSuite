@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RoadBoard v0.1.0</title>
+    <title>FreightLens v0.1.1</title>
     <script>
       tailwind = { config: { darkMode: "class" } };
     </script>
@@ -17,19 +17,107 @@
         } catch {}
       })();
     </script>
+    <style>
+      #greenlight-ticker {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid rgba(16, 185, 129, 0.3);
+        background: linear-gradient(90deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04));
+      }
+
+      #greenlight-ticker .greenlight-marquee {
+        overflow: hidden;
+      }
+
+      #greenlight-ticker .greenlight-marquee-track {
+        display: inline-flex;
+        align-items: center;
+        gap: 2.75rem;
+        animation: news-marquee 60s linear infinite;
+        will-change: transform;
+        white-space: nowrap;
+      }
+
+      #greenlight-ticker .greenlight-marquee-track a {
+        color: #22c55e;
+        text-decoration: none;
+        font-size: 0.75rem;
+        letter-spacing: 0.03em;
+      }
+
+      #news-ticker {
+        position: fixed;
+        inset: auto 0 0;
+        z-index: 20;
+        border-top: 1px solid rgba(148, 163, 184, 0.5);
+        background: linear-gradient(90deg, rgba(23, 30, 60, 0.95), rgba(14, 116, 144, 0.95));
+        backdrop-filter: blur(6px);
+      }
+
+      #news-ticker .news-marquee {
+        overflow: hidden;
+      }
+
+      #news-ticker .news-marquee-track {
+        display: inline-flex;
+        align-items: center;
+        gap: 3rem;
+        animation: news-marquee 120s linear infinite;
+        will-change: transform;
+      }
+
+      @keyframes news-marquee {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(-50%);
+        }
+      }
+    </style>
   </head>
-  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 pb-24">
+    <section id="greenlight-ticker" class="w-full">
+      <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.35em] text-emerald-500">
+        <span class="flex-shrink-0">GreenLight</span>
+        <div class="flex-1 overflow-hidden">
+          <div class="greenlight-marquee" role="marquee" aria-live="polite">
+            <div id="greenlight-marquee-track" class="greenlight-marquee-track"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div class="max-w-3xl lg:max-w-6xl mx-auto px-4 py-4">
       <header class="flex items-center justify-between gap-3 pb-3">
-        <div>
-          <div class="text-lg font-semibold leading-tight">RoadBoard v0.1.0</div>
-          <div id="meta" class="text-xs text-slate-600 dark:text-slate-400"></div>
+        <div class="flex items-center gap-3">
+          <img
+            src="/static/images/freightlens-logo.png"
+            alt="FreightLens logo"
+            class="h-12 w-auto object-contain"
+          />
+          <div>
+            <div class="text-lg font-semibold leading-tight">FreightLens Terminal v0.1.1</div>
+            <div id="meta" class="text-xs text-slate-600 dark:text-slate-400"></div>
+          </div>
         </div>
         <a href="/#/settings" class="text-sm font-medium underline">Settings</a>
       </header>
 
       <main id="app"></main>
     </div>
+
+    <section id="news-ticker" class="w-full">
+      <div class="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-200">
+        <span class="flex-shrink-0 text-emerald-300">Freight Alerts</span>
+        <div class="flex-1 overflow-hidden">
+          <div class="news-marquee" role="marquee" aria-live="polite">
+            <div id="news-marquee-track" class="news-marquee-track"></div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <script src="/static/app.js"></script>
   </body>
