@@ -1242,7 +1242,7 @@ const renderList = async (root) => {
                 el("img", {
                   src: "/static/images/gl_glyph.png",
                   alt: "GreenLight",
-                  class: "inline-block align-middle h-4 w-4",
+                  class: "inline-block align-middle h-4 w-4 transform scale-150",
                 }),
               ]
             ),
