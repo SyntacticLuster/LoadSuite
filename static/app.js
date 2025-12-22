@@ -237,21 +237,13 @@ const renderTempLabel = (value, unit, opts = {}) => {
   const fForColor = u === "C" ? (n * 9) / 5 + 32 : n;
   const cls = tempClassForF(fForColor);
 
-  const showSnowflake = Number.isFinite(fForColor) && fForColor < 32;
-  const showThermometer = Number.isFinite(fForColor) && fForColor > 80;
-
-  // For moderate temps, show ☀️ during day and 🌙 at night.
-  const isModerate = !showSnowflake && !showThermometer;
-  const isDay = typeof opts.isDay === "boolean" ? opts.isDay : null;
-  const showSun = isModerate && isDay === true;
-  const showMoon = isModerate && isDay === false;
+  const showSnowflake = Number.isFinite(fForColor) && fForColor <= 34;
+  const showThermometer = Number.isFinite(fForColor) && fForColor >= 80;
 
   return el("span", { class: cls }, [
     `${Math.round(n)}°${u || ""}`,
     showSnowflake ? " ❄️" : "",
     showThermometer ? " 🌡️" : "",
-    showSun ? " ☀️" : "",
-    showMoon ? " 🌙" : "",
   ]);
 };
 
