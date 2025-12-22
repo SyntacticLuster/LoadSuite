@@ -153,6 +153,7 @@ def _with_request_debug(wsgi_app):
         # alive until the iterable is exhausted / closed.
         tb_file = None
         watchdog_armed = False
+        returned_iterable = False
         try:
             tb_path = _append_log_path("passenger_traceback.log")
             tb_file = open(tb_path, "a", encoding="utf-8")
@@ -228,25 +229,30 @@ def _with_request_debug(wsgi_app):
                     finally:
                         _cleanup("close()")
 
+            returned_iterable = True
             return _WrappedIterable()
         except Exception:
             _debug_log("REQ exception: " + traceback.format_exc().strip())
             raise
         finally:
-            # If we errored before returning an iterable, clean up the watchdog here.
-            try:
-                if watchdog_armed:
-                    faulthandler.cancel_dump_traceback_later()
-                    watchdog_armed = False
-            except Exception:
-                pass
-            try:
-                if tb_file is not None and not tb_file.closed:
-                    tb_file.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] watchdog disarm (early-exit) path={path_info!r}\n")
-                    tb_file.flush()
-                    tb_file.close()
-            except Exception:
-                pass
+            # Only clean up here if we are NOT returning a streaming iterable.
+            # If we returned an iterable, cleanup happens when Passenger exhausts/closes it.
+            if not returned_iterable:
+                try:
+                    if watchdog_armed:
+                        faulthandler.cancel_dump_traceback_later()
+                        watchdog_armed = False
+                except Exception:
+                    pass
+                try:
+                    if tb_file is not None and not tb_file.closed:
+                        tb_file.write(
+                            f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] watchdog disarm (early-exit) path={path_info!r}\n"
+                        )
+                        tb_file.flush()
+                        tb_file.close()
+                except Exception:
+                    pass
 
     return _app
 
