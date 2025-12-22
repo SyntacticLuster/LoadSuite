@@ -223,8 +223,8 @@ const tempClassForF = (tempF) => {
   if (tempF === null || tempF === undefined) return "";
   const f = Number(tempF);
   if (!Number.isFinite(f)) return "";
-  if (f < 32) return "text-sky-600 dark:text-sky-400";
-  if (f > 80) return "text-red-600 dark:text-red-400";
+  if (f <= 34) return "text-sky-600 dark:text-sky-400";
+  if (f >= 80) return "text-red-600 dark:text-red-400";
   return "";
 };
 
