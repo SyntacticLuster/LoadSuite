@@ -166,10 +166,30 @@ python3 -c "import secrets; print(secrets.token_urlsafe(64))"
 3. Configure:
    - Python version: `3.11` (or highest available)
    - Application root: `apps/LoadSuite`
-   - Application URL: `/` or `/loadsuite`
+   - Application URL: `/FreightLens` (recommended for `apps.orbitsuite.cloud/FreightLens`)
    - Application startup file: `passenger_wsgi.py`
    - Application Entry point: `application`
 4. Click **Create**
+
+### Recommended domain layout (apps subdomain)
+
+If you want the app to live at `https://apps.orbitsuite.cloud/FreightLens`:
+
+1. Create the subdomain `apps.orbitsuite.cloud` in cPanel.
+2. Create the Python app with **Application URL** set to `/FreightLens`.
+
+The UI and API in this repo are compatible with being hosted under a subpath like `/FreightLens` (no Apache proxy rewrite required).
+
+#### Note: Passenger is WSGI, FastAPI is ASGI
+
+cPanel's "Setup Python App" runs your app through Phusion Passenger in **WSGI** mode.
+FastAPI is an **ASGI** app, so the included `passenger_wsgi.py` uses an ASGI→WSGI adapter.
+
+Make sure the adapter dependency is installed in your cPanel app environment:
+
+```bash
+pip install a2wsgi
+```
 
 Create `passenger_wsgi.py` in your LoadSuite directory:
 

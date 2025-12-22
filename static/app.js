@@ -118,14 +118,32 @@ const clearFilterDefaults = () => {
   } catch {}
 };
 
+const appBasePath = (() => {
+  // Compute a stable base like "/" or "/FreightLens/".
+  // This lets the app run when mounted under a subpath (cPanel Passenger Application URL).
+  let p = window.location.pathname || "/";
+  if (!p.endsWith("/")) p = `${p}/`;
+  return p;
+})();
+
+const toAppUrl = (path) => {
+  const raw = String(path ?? "");
+  if (!raw) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+
+  const normalized = raw.startsWith("/") ? raw.slice(1) : raw;
+  const base = appBasePath.endsWith("/") ? appBasePath : `${appBasePath}/`;
+  return `${base}${normalized}`;
+};
+
 const apiGet = async (path) => {
-  const res = await fetch(path);
+  const res = await fetch(toAppUrl(path));
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return await res.json();
 };
 
 const apiPostJson = async (path, body) => {
-  const res = await fetch(path, {
+  const res = await fetch(toAppUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body ?? {}),
@@ -136,7 +154,7 @@ const apiPostJson = async (path, body) => {
 
 const apiPostFileBytes = async (path, file) => {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const res = await fetch(path, {
+  const res = await fetch(toAppUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/octet-stream" },
     body: bytes,
@@ -554,7 +572,7 @@ const renderWeatherSidebar = () => {
   // RouteCast (last selected load) lives under the weather widgets.
   const routecastWidget = renderRouteCastWidget(state.lastSelectedLoadId, { compact: true });
 
-  return el("div", { class: "space-y-3 lg:w-80 lg:flex-shrink-0" }, [
+  return el("div", { class: "space-y-3 lg:w-80 lg:flex-shrink-0 lg:sticky lg:top-16 lg:self-start" }, [
     forecastWidget,
     alertsWidget,
     routecastWidget,
@@ -728,7 +746,7 @@ const newsTickerState = { items: [] };
 // =============================================================================
 
 const apiPut = async (path, body) => {
-  const res = await fetch(path, {
+  const res = await fetch(toAppUrl(path), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body ?? {}),
@@ -738,7 +756,7 @@ const apiPut = async (path, body) => {
 };
 
 const apiDelete = async (path) => {
-  const res = await fetch(path, { method: "DELETE" });
+  const res = await fetch(toAppUrl(path), { method: "DELETE" });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return await res.json();
 };
@@ -1035,12 +1053,22 @@ const renderList = async (root) => {
       },
     },
     [
-      state.filtersOpen ? "Hide Filters, Sort & " : "Show Filters, Sort & ",
-      el("img", {
-        src: "/static/images/gl_logo.png",
-        alt: "GreenLight",
-        class: "h-6 w-auto object-contain inline-block align-middle",
-      }),
+      state.filtersOpen ? "Hide Filters, Sort &  " : "Show Filters, Sort &  ",
+      el("span", { class: "inline-flex items-center align-middle" }, [
+        el("img", {
+          src: "/static/images/gl_glyph.png",
+          alt: "GreenLight",
+          class: "inline-block align-middle h-4 w-4 transform scale-150",
+        }),
+        el(
+          "span",
+          {
+            class:
+              "ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900 dark:text-green-200",
+          },
+          ["GreenLight"]
+        ),
+      ]),
     ]
   );
 
@@ -1123,7 +1151,12 @@ const renderList = async (root) => {
       return ok ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
     };
 
-    const rpmClass = `text-xs ${maybeClass(rpmOk, "text-slate-600 dark:text-slate-400")}`;
+    const rpmTone = (() => {
+      if (rpmOk === false) return "text-red-600 dark:text-red-400";
+      if (rpmOk === true && greenlightOk) return "text-green-600 dark:text-green-400";
+      return "text-slate-600 dark:text-slate-400";
+    })();
+    const rpmClass = `text-xs ${rpmTone}`;
     const equipClass = maybeClass(equipmentOk, "");
     const weightClass = maybeClass(weightOk, "");
     const detentionClass = maybeClass(detentionOk, "");
@@ -1148,6 +1181,30 @@ const renderList = async (root) => {
           },
           [`${scoreValue.toFixed(0)}`]
         )
+      : null;
+
+    const scoreCluster = hasScore
+      ? (() => {
+          const greenlightGlyph = el(
+            "span",
+            {
+              class: greenlightOk
+                ? "mr-1 inline-flex items-center"
+                : "mr-1 inline-flex items-center invisible",
+            },
+            [
+              el("img", {
+                src: "/static/images/gl_glyph.png",
+                alt: "GreenLight",
+                class: "inline-block align-middle h-4 w-4 transform scale-150",
+              }),
+            ]
+          );
+          return el("div", { class: "flex items-center" }, [
+            greenlightGlyph,
+            scoreBadge,
+          ].filter(Boolean));
+        })()
       : null;
 
     // Build top reasons (inline, expandable)
@@ -1202,7 +1259,7 @@ const renderList = async (root) => {
             el("div", { class: routeClass }, [
               `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
             ]),
-            scoreBadge,
+            scoreCluster,
           ].filter(Boolean)),
           el("div", { class: "flex items-center text-right" }, [
             el("div", {}, [
@@ -1231,21 +1288,6 @@ const renderList = async (root) => {
               load.multi_stop ? " • Multi-stop" : "",
               load.lane_history ? " • Lane history" : "",
             ]),
-            el(
-              "span",
-              {
-                class: greenlightOk
-                  ? "text-lg leading-none text-green-400 dark:text-green-300"
-                  : "text-lg leading-none invisible",
-              },
-              [
-                el("img", {
-                  src: "/static/images/gl_glyph.png",
-                  alt: "GreenLight",
-                  class: "inline-block align-middle h-4 w-4 transform scale-150",
-                }),
-              ]
-            ),
           ]
         ),
       ]
@@ -1297,11 +1339,21 @@ const renderPrefsPanel = () => {
 
   wrap.appendChild(
     el("div", { class: "text-sm font-semibold" }, [
-      el("img", {
-        src: "/static/images/gl_logo.png",
-        alt: "GreenLight",
-        class: "h-7 w-auto object-contain",
-      }),
+      el("span", { class: "inline-flex items-center align-middle" }, [
+        el("img", {
+          src: "/static/images/gl_glyph.png",
+          alt: "GreenLight",
+          class: "inline-block align-middle h-4 w-4 transform scale-150",
+        }),
+        el(
+          "span",
+          {
+            class:
+              "ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900 dark:text-green-200",
+          },
+          ["GreenLight"]
+        ),
+      ]),
     ])
   );
 
@@ -1345,11 +1397,21 @@ const renderPrefsPanel = () => {
       row(
         el("span", { class: "inline-flex items-center gap-2" }, [
           "Sort by",
-          el("img", {
-            src: "/static/images/gl_logo.png",
-            alt: "GreenLight",
-            class: "h-6 w-auto object-contain",
-          }),
+          el("span", { class: "inline-flex items-center" }, [
+            el("img", {
+              src: "/static/images/gl_glyph.png",
+              alt: "GreenLight",
+              class: "inline-block align-middle h-4 w-4 transform scale-150",
+            }),
+            el(
+              "span",
+              {
+                class:
+                  "ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900 dark:text-green-200",
+              },
+              ["GreenLight"]
+            ),
+          ]),
         ]),
         el("div", { class: "flex items-center justify-end gap-4" }, [
           el("label", { class: "flex items-center gap-2 text-sm" }, [
@@ -1381,20 +1443,30 @@ const renderPrefsPanel = () => {
     "button",
     {
       class:
-        "mt-3 w-full rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600",
+        "mt-3 w-full flex items-center justify-center gap-2 rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600",
       onclick: () => {
         state.prefs = { ...state.prefsDraft };
         render();
       },
     },
     [
-      "Apply ",
-      el("img", {
-        src: "/static/images/gl_logo.png",
-        alt: "GreenLight",
-        class: "h-6 w-auto object-contain inline-block align-middle",
-      }),
-      " parameters",
+      "Apply",
+      el("span", { class: "inline-flex items-center align-middle" }, [
+        el("img", {
+          src: "/static/images/gl_glyph.png",
+          alt: "GreenLight",
+          class: "inline-block align-middle h-4 w-4 transform scale-150",
+        }),
+        el(
+          "span",
+          {
+            class:
+              "ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900 dark:text-green-200",
+          },
+          ["GreenLight"]
+        ),
+      ]),
+      "parameters",
     ]
   );
   wrap.appendChild(applyBtn);
@@ -1726,12 +1798,12 @@ const renderDetail = async (root, id) => {
       )
     : null;
 
-  const greenlightBadge = hasActivePrefs() && isGreenLight(load)
-    ? el("span", { class: "ml-2 inline-flex items-center" }, [
+  const greenlightBadge = scoreBadge && hasActivePrefs() && isGreenLight(load)
+    ? el("span", { class: "mr-1 inline-flex items-center" }, [
         el("img", {
-          src: "/static/images/gl_logo.png",
+          src: "/static/images/gl_glyph.png",
           alt: "GreenLight",
-          class: "h-8 w-auto object-contain",
+          class: "inline-block align-middle h-4 w-4 transform scale-150",
         }),
       ])
     : null;
@@ -1774,9 +1846,9 @@ const renderDetail = async (root, id) => {
       el("div", { class: "text-base font-semibold" }, [
         `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
       ]),
-      el("div", { class: "flex items-center gap-2" }, [
-        scoreBadge,
+      el("div", { class: "flex items-center" }, [
         greenlightBadge,
+        scoreBadge,
       ].filter(Boolean)),
     ]),
     el("div", { class: "pt-2 text-sm" }, [

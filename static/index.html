@@ -79,13 +79,14 @@
   </head>
   <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 pb-24">
     <section id="greenlight-ticker" class="w-full">
-      <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.35em] text-emerald-500">
-        <span class="flex-shrink-0">
+      <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.35em] text-emerald-500">
+        <span class="flex-shrink-0 inline-flex items-center">
           <img
-            src="/static/images/gl_logo.png"
+            src="static/images/gl_glyph.png"
             alt="GreenLight"
-            class="h-7 w-auto object-contain"
+            class="inline-block align-middle h-4 w-4 transform scale-150"
           />
+          <span class="ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 normal-case tracking-normal dark:bg-green-900 dark:text-green-200">GreenLight</span>
         </span>
         <div class="flex-1 overflow-hidden">
           <div class="greenlight-marquee" role="marquee" aria-live="polite">
@@ -98,9 +99,9 @@
     <div class="max-w-3xl lg:max-w-6xl mx-auto px-4 py-4">
       <header class="flex items-center justify-between gap-3 pb-3">
         <div class="flex items-center gap-3">
-          <a href="/#/" aria-label="FreightLens home">
+          <a href="#/" aria-label="FreightLens home">
             <img
-              src="/static/images/freightlens-logo.png"
+              src="static/images/freightlens-logo.png"
               alt="FreightLens logo"
               class="h-12 w-auto object-contain"
             />
@@ -110,7 +111,7 @@
             <div id="meta" class="text-xs text-slate-600 dark:text-slate-400"></div>
           </div>
         </div>
-        <a href="/#/settings" class="text-sm font-medium underline">Settings</a>
+        <a href="#/settings" class="text-sm font-medium underline">Settings</a>
       </header>
 
       <main id="app"></main>
@@ -127,6 +128,6 @@
       </div>
     </section>
 
-    <script src="/static/app.js"></script>
+    <script src="static/app.js"></script>
   </body>
 </html>
