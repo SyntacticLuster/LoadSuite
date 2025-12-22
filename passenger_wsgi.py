@@ -11,6 +11,8 @@ import time
 import traceback
 import faulthandler
 import json
+import asyncio
+import threading
 from typing import Iterable
 
 # Add application directory to Python path
@@ -72,7 +74,12 @@ except Exception:
     raise
 
 
-def _build_wsgi_application():
+_wsgi_app = None
+_wsgi_app_pid: int | None = None
+_wsgi_app_lock = threading.Lock()
+
+
+def _create_wsgi_application():
     """Build a WSGI callable for Passenger.
 
     cPanel's "Setup Python App" uses Phusion Passenger in WSGI mode.
@@ -89,7 +96,42 @@ def _build_wsgi_application():
         ) from e
 
     _debug_log("Building ASGI->WSGI adapter")
-    return ASGIMiddleware(asgi_app)
+
+    # Passenger may pre-fork worker processes. Threads created before a fork can
+    # become inert/broken in the child. So we create an event loop thread per-PID
+    # and recreate the adapter if PID changes.
+    loop = asyncio.new_event_loop()
+
+    def _run_loop() -> None:
+        try:
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+        except Exception:
+            _debug_log("ASGI loop thread crashed: " + traceback.format_exc().strip())
+            raise
+
+    thread = threading.Thread(target=_run_loop, daemon=True)
+    thread.start()
+    _debug_log("ASGI loop thread started")
+
+    return ASGIMiddleware(asgi_app, loop=loop)
+
+
+def _get_wsgi_application():
+    """Get (or rebuild) the WSGI app.
+
+    If Passenger pre-forked after import, the loop thread in the child may not be
+    alive. We detect PID changes and rebuild.
+    """
+
+    global _wsgi_app, _wsgi_app_pid
+    pid = os.getpid()
+    with _wsgi_app_lock:
+        if _wsgi_app is None or _wsgi_app_pid != pid:
+            _debug_log(f"(re)initializing WSGI adapter for pid={pid}")
+            _wsgi_app = _create_wsgi_application()
+            _wsgi_app_pid = pid
+        return _wsgi_app
 
 
 def _with_request_debug(wsgi_app):
@@ -178,7 +220,9 @@ def _with_request_debug(wsgi_app):
             return start_response(status, headers, exc_info)
 
         try:
-            result: Iterable[bytes] = wsgi_app(environ, _sr)
+            # Resolve the actual adapter at request time (fork-safe).
+            resolved_app = _get_wsgi_application() if wsgi_app is None else wsgi_app
+            result: Iterable[bytes] = resolved_app(environ, _sr)
             _debug_log(f"REQ wsgi_app returned iterable path={path_info!r}")
 
             def _cleanup(note: str) -> None:
