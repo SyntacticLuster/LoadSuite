@@ -1248,7 +1248,7 @@ const renderList = async (root) => {
     const row = el(
       "a",
       {
-        href: `/#/load/${load.id}`,
+        href: `${appBasePath}#/load/${load.id}`,
         onclick: () => setLastSelectedLoadId(load.id),
         class:
           "block rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800",
@@ -2112,7 +2112,7 @@ const _updateGreenlightTicker = (loads = []) => {
           return el(
             "a",
             {
-              href: `/#/load/${load.id}`,
+              href: `${appBasePath}#/load/${load.id}`,
               class: "text-[0.75rem] font-semibold tracking-wide text-emerald-400 transition hover:text-emerald-100",
             },
             [`${route} • ${fmtMoney(load.rate_total_usd)}`]
