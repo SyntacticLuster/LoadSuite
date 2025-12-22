@@ -40,6 +40,13 @@ from .stores import (
 )
 from .scoring import ScoringEngine
 from .scoring.models import UserPreferences
+from .weather import (
+    alerts_for_zip,
+    forecast_for_zip,
+    geocode_city_state,
+    merge_alerts_for_points,
+    nws_current_by_point,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +134,45 @@ def meta() -> dict[str, Any]:
         "environment": settings.environment,
         "use_database": settings.use_database,
     }
+
+
+# =============================================================================
+# Weather Widgets (Forecast + Alerts)
+# =============================================================================
+
+
+@app.get("/api/weather/forecast")
+def weather_forecast(zip: str = Query(..., description="5-digit US ZIP code")) -> dict[str, Any]:
+    try:
+        return forecast_for_zip(zip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("weather forecast fetch failed")
+        raise HTTPException(status_code=502, detail="weather provider unavailable") from e
+
+
+@app.get("/api/weather/alerts")
+def weather_alerts(zip: str = Query(..., description="5-digit US ZIP code")) -> dict[str, Any]:
+    try:
+        return alerts_for_zip(zip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.warning("weather alerts fetch failed: %s", e)
+        # For transient provider issues (timeouts, upstream slowness), return a stable
+        # payload so the UI can render an 'unavailable' state without retry-storming.
+        return {
+            "zip": (zip or "")[:5],
+            "location": None,
+            "lat": None,
+            "lon": None,
+            "alerts": {"count": 0, "alerts": [], "updated": None, "unavailable": True},
+        }
 
 
 @app.get("/api/loads")
@@ -316,6 +362,69 @@ def get_load(load_id: str) -> dict[str, Any]:
         if load.id == load_id:
             return load.model_dump(mode="json")
     raise HTTPException(status_code=404, detail="Load not found")
+
+
+@app.get("/api/loads/{load_id}/routecast")
+def get_routecast(load_id: str) -> dict[str, Any]:
+    load: Load | None = None
+    for l in _dataset.loads:
+        if l.id == load_id:
+            load = l
+            break
+    if load is None:
+        raise HTTPException(status_code=404, detail="Load not found")
+
+    try:
+        o = geocode_city_state(load.origin.city, load.origin.state)
+        d = geocode_city_state(load.destination.city, load.destination.state)
+    except (ValueError, LookupError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    try:
+        origin_current = nws_current_by_point(o["lat"], o["lon"])
+    except Exception:
+        logger.exception("routecast origin current failed")
+        origin_current = None
+
+    try:
+        destination_current = nws_current_by_point(d["lat"], d["lon"])
+    except Exception:
+        logger.exception("routecast destination current failed")
+        destination_current = None
+
+    # Sample a handful of points along the straight-line route.
+    samples: list[tuple[float, float]] = []
+    steps = 5
+    for i in range(steps):
+        t = i / max(steps - 1, 1)
+        lat = o["lat"] + (d["lat"] - o["lat"]) * t
+        lon = o["lon"] + (d["lon"] - o["lon"]) * t
+        samples.append((float(lat), float(lon)))
+
+    try:
+        route_alerts = merge_alerts_for_points(samples)
+    except Exception:
+        logger.exception("routecast alerts failed")
+        route_alerts = {"count": 0, "alerts": []}
+
+    return {
+        "load_id": load.id,
+        "origin": {
+            "city": load.origin.city,
+            "state": load.origin.state,
+            "lat": o["lat"],
+            "lon": o["lon"],
+            "current": origin_current,
+        },
+        "destination": {
+            "city": load.destination.city,
+            "state": load.destination.state,
+            "lat": d["lat"],
+            "lon": d["lon"],
+            "current": destination_current,
+        },
+        "route_alerts": route_alerts,
+    }
 
 
 @app.post("/api/refresh")

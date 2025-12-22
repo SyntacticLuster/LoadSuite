@@ -32,6 +32,92 @@ const setTheme = (theme) => {
   applyTheme(theme);
 };
 
+const WEATHER_ZIP_STORAGE_KEY = "lb_weather_zip";
+const LAST_SELECTED_LOAD_STORAGE_KEY = "lb_last_selected_load_id";
+const GREENLIGHT_DEFAULTS_STORAGE_KEY = "lb_greenlight_defaults";
+const FILTER_DEFAULTS_STORAGE_KEY = "lb_filter_defaults";
+
+const getWeatherZip = () => {
+  try {
+    const z = String(localStorage.getItem(WEATHER_ZIP_STORAGE_KEY) || "").trim();
+    return z;
+  } catch {
+    return "";
+  }
+};
+
+const setWeatherZip = (zip) => {
+  const z = String(zip ?? "").trim();
+  try {
+    if (!z) localStorage.removeItem(WEATHER_ZIP_STORAGE_KEY);
+    else localStorage.setItem(WEATHER_ZIP_STORAGE_KEY, z);
+  } catch {}
+};
+
+const getLastSelectedLoadId = () => {
+  try {
+    const v = String(localStorage.getItem(LAST_SELECTED_LOAD_STORAGE_KEY) || "").trim();
+    return v;
+  } catch {
+    return "";
+  }
+};
+
+const setLastSelectedLoadId = (loadId) => {
+  const v = String(loadId || "").trim();
+  try {
+    if (!v) localStorage.removeItem(LAST_SELECTED_LOAD_STORAGE_KEY);
+    else localStorage.setItem(LAST_SELECTED_LOAD_STORAGE_KEY, v);
+  } catch {}
+  state.lastSelectedLoadId = v;
+};
+
+const getGreenLightDefaults = () => {
+  try {
+    const raw = localStorage.getItem(GREENLIGHT_DEFAULTS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const setGreenLightDefaults = (prefs) => {
+  try {
+    localStorage.setItem(GREENLIGHT_DEFAULTS_STORAGE_KEY, JSON.stringify(prefs ?? {}));
+  } catch {}
+};
+
+const clearGreenLightDefaults = () => {
+  try {
+    localStorage.removeItem(GREENLIGHT_DEFAULTS_STORAGE_KEY);
+  } catch {}
+};
+
+const getFilterDefaults = () => {
+  try {
+    const raw = localStorage.getItem(FILTER_DEFAULTS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const setFilterDefaults = (query) => {
+  try {
+    localStorage.setItem(FILTER_DEFAULTS_STORAGE_KEY, JSON.stringify(query ?? {}));
+  } catch {}
+};
+
+const clearFilterDefaults = () => {
+  try {
+    localStorage.removeItem(FILTER_DEFAULTS_STORAGE_KEY);
+  } catch {}
+};
+
 const apiGet = async (path) => {
   const res = await fetch(path);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -65,57 +151,529 @@ const apiPostFileBytes = async (path, file) => {
 const fmtMoney = (n) => `$${Number(n).toFixed(0)}`;
 const fmtNum = (n, digits = 0) => Number(n).toFixed(digits);
 
+const weatherEmojiForText = (text, { isDay } = {}) => {
+  const t = String(text || "").toLowerCase();
+  if (!t) return "";
+
+  // Order matters: check more specific / severe conditions first.
+  if (t.includes("tornado")) return "🌪️";
+  if (t.includes("thunder") || t.includes("t-storm") || t.includes("tstorm") || t.includes("storm")) return "⛈️";
+  if (t.includes("hail")) return "🌨️";
+  if (t.includes("sleet") || t.includes("freezing rain") || t.includes("ice")) return "🧊";
+  if (t.includes("snow") || t.includes("flurr")) return "🌨️";
+  if (t.includes("rain") || t.includes("shower") || t.includes("drizzle")) return "🌧️";
+  if (t.includes("fog") || t.includes("mist")) return "🌫️";
+  if (t.includes("smoke") || t.includes("haze") || t.includes("dust") || t.includes("sand")) return "🌫️";
+  if (t.includes("wind")) return "💨";
+
+  // Cloud coverage
+  if (t.includes("overcast")) return "☁️";
+  if (t.includes("cloud")) return "⛅";
+
+  // Clear / fair
+  if (t.includes("clear") || t.includes("sunny") || t.includes("fair")) return isDay === false ? "🌙" : "☀️";
+
+  return "";
+};
+
+// Day/night helper (no API calls): compute whether the sun is above the horizon.
+// Used to render ☀️ vs 🌙 for moderate temperatures.
+const isSunUpAt = (latDeg, lonDeg, when) => {
+  const lat = Number(latDeg);
+  const lon = Number(lonDeg);
+  const date = when instanceof Date ? when : new Date(when);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (!(date instanceof Date) || Number.isNaN(date.valueOf())) return null;
+
+  // Julian day (UTC)
+  const jd = date.valueOf() / 86400000 + 2440587.5;
+  const n = jd - 2451545.0;
+
+  const deg2rad = (d) => (d * Math.PI) / 180;
+  const rad2deg = (r) => (r * 180) / Math.PI;
+
+  // Solar coordinates (approx)
+  const L = (280.460 + 0.9856474 * n) % 360; // mean longitude
+  const g = (357.528 + 0.9856003 * n) % 360; // mean anomaly
+  const lambda = L + 1.915 * Math.sin(deg2rad(g)) + 0.020 * Math.sin(deg2rad(2 * g)); // ecliptic lon
+  const epsilon = 23.439 - 0.0000004 * n; // obliquity
+
+  const sinLambda = Math.sin(deg2rad(lambda));
+  const cosLambda = Math.cos(deg2rad(lambda));
+  const cosEps = Math.cos(deg2rad(epsilon));
+  const sinEps = Math.sin(deg2rad(epsilon));
+
+  const alpha = rad2deg(Math.atan2(cosEps * sinLambda, cosLambda)); // RA deg
+  const delta = Math.asin(sinEps * sinLambda); // declination rad
+
+  // Greenwich mean sidereal time (deg)
+  const theta = (280.46061837 + 360.98564736629 * n) % 360;
+  // Local hour angle (deg)
+  const H = deg2rad(((theta + lon - alpha + 540) % 360) - 180);
+
+  const latRad = deg2rad(lat);
+  const altitude = Math.asin(
+    Math.sin(latRad) * Math.sin(delta) + Math.cos(latRad) * Math.cos(delta) * Math.cos(H)
+  );
+
+  return altitude > 0;
+};
+
+const tempClassForF = (tempF) => {
+  if (tempF === null || tempF === undefined) return "";
+  const f = Number(tempF);
+  if (!Number.isFinite(f)) return "";
+  if (f < 32) return "text-sky-600 dark:text-sky-400";
+  if (f > 80) return "text-red-600 dark:text-red-400";
+  return "";
+};
+
+const renderTempLabel = (value, unit, opts = {}) => {
+  if (value === null || value === undefined) return el("span", {}, [""]);
+  const n = Number(value);
+  if (!Number.isFinite(n)) return el("span", {}, [""]);
+
+  const u = String(unit || "").toUpperCase();
+  const fForColor = u === "C" ? (n * 9) / 5 + 32 : n;
+  const cls = tempClassForF(fForColor);
+
+  const showSnowflake = Number.isFinite(fForColor) && fForColor < 32;
+  const showThermometer = Number.isFinite(fForColor) && fForColor > 80;
+
+  // For moderate temps, show ☀️ during day and 🌙 at night.
+  const isModerate = !showSnowflake && !showThermometer;
+  const isDay = typeof opts.isDay === "boolean" ? opts.isDay : null;
+  const showSun = isModerate && isDay === true;
+  const showMoon = isModerate && isDay === false;
+
+  return el("span", { class: cls }, [
+    `${Math.round(n)}°${u || ""}`,
+    showSnowflake ? " ❄️" : "",
+    showThermometer ? " 🌡️" : "",
+    showSun ? " ☀️" : "",
+    showMoon ? " 🌙" : "",
+  ]);
+};
+
 const getHashRoute = () => {
   const h = window.location.hash || "#/";
   const parts = h.replace(/^#\//, "").split("/");
   return { page: parts[0] || "", id: parts[1] || null };
 };
 
+const DEFAULT_QUERY = {
+  q: "",
+  equipment: "",
+  hazmat: "",
+  weight_min: "",
+  weight_max: "",
+  deadhead_max: "",
+  rpm_min: "",
+  broker_rating_min: "",
+  detention: "",
+  multi_stop: "",
+  lane_history: "",
+  sort: "composite",
+};
+
+const DEFAULT_PREFS = {
+  rpm_min: "",
+  equipment: "",
+  weight_max: "",
+  weight_min: "",
+  detention: "",
+  broker_rating_min: "",
+  deadhead_max: "",
+  hazmat: "",
+  multi_stop: "",
+  greenlight_sort: "",
+};
+
 const state = {
   filtersOpen: false,
   terminalPanelOpen: false,
-  query: {
-    q: "",
-    equipment: "",
-    hazmat: "",
-    weight_min: "",
-    weight_max: "",
-    deadhead_max: "",
-    rpm_min: "",
-    broker_rating_min: "",
-    detention: "",
-    multi_stop: "",
-    lane_history: "",
-    sort: "composite",
+  ui: {
+    collapseForecast: false,
+    collapseAlerts: false,
+    collapseRouteCast: false,
   },
-  prefsDraft: {
-    rpm_min: "",
-    equipment: "",
-    weight_max: "",
-    weight_min: "",
-    detention: "",
-    broker_rating_min: "",
-    deadhead_max: "",
-    hazmat: "",
-    multi_stop: "",
-    greenlight_sort: "",
-  },
-  prefs: {
-    rpm_min: "",
-    equipment: "",
-    weight_max: "",
-    weight_min: "",
-    detention: "",
-    broker_rating_min: "",
-    deadhead_max: "",
-    hazmat: "",
-    multi_stop: "",
-    greenlight_sort: "",
-  },
+  query: { ...DEFAULT_QUERY },
+  prefsDraft: { ...DEFAULT_PREFS },
+  prefs: { ...DEFAULT_PREFS },
   latestLoads: [],
   scoredLoads: {},      // Map of load_id -> score data
   watchlist: new Set(), // Set of watched load IDs
   filterPresets: [],    // Saved filter presets
+
+  lastSelectedLoadId: "",
+
+  routecast: {
+    loadId: "",
+    data: null,
+    error: "",
+    fetching: false,
+    fetchedAtMs: 0,
+  },
+
+  weather: {
+    zip: "",
+    zipDraft: "",
+    forecast: null,
+    alerts: null,
+    forecastError: "",
+    alertsError: "",
+    fetchingForecast: false,
+    fetchingAlerts: false,
+    fetchedAtForecastMs: 0,
+    fetchedAtAlertsMs: 0,
+  },
+};
+
+const WEATHER_FORECAST_TTL_MS = 10 * 60 * 1000;
+const WEATHER_ALERTS_TTL_MS = 2 * 60 * 1000;
+const ROUTECAST_TTL_MS = 2 * 60 * 1000;
+
+const _normalizeZip = (raw) => {
+  const s = String(raw ?? "").trim();
+  const digits = s.replace(/\D+/g, "");
+  return digits.length >= 5 ? digits.slice(0, 5) : digits;
+};
+
+const fetchWeatherForecast = async () => {
+  const zip = _normalizeZip(state.weather.zip);
+  if (!zip || zip.length !== 5) return;
+  if (state.weather.fetchingForecast) return;
+
+  const now = Date.now();
+  if (state.weather.forecast && state.weather.fetchedAtForecastMs && now - state.weather.fetchedAtForecastMs < WEATHER_FORECAST_TTL_MS) {
+    return;
+  }
+
+  state.weather.fetchingForecast = true;
+  state.weather.forecastError = "";
+  try {
+    const payload = await apiGet(`/api/weather/forecast?zip=${encodeURIComponent(zip)}`);
+    // If ZIP changed while in-flight, ignore.
+    if (_normalizeZip(state.weather.zip) !== zip) return;
+    state.weather.forecast = payload;
+    state.weather.fetchedAtForecastMs = Date.now();
+  } catch (err) {
+    state.weather.forecast = null;
+    state.weather.forecastError = err?.message || String(err);
+  } finally {
+    state.weather.fetchingForecast = false;
+    render();
+  }
+};
+
+const fetchWeatherAlerts = async () => {
+  const zip = _normalizeZip(state.weather.zip);
+  if (!zip || zip.length !== 5) return;
+  if (state.weather.fetchingAlerts) return;
+
+  const now = Date.now();
+  if (state.weather.alerts && state.weather.fetchedAtAlertsMs && now - state.weather.fetchedAtAlertsMs < WEATHER_ALERTS_TTL_MS) {
+    return;
+  }
+
+  state.weather.fetchingAlerts = true;
+  state.weather.alertsError = "";
+  try {
+    const payload = await apiGet(`/api/weather/alerts?zip=${encodeURIComponent(zip)}`);
+    if (_normalizeZip(state.weather.zip) !== zip) return;
+    state.weather.alerts = payload;
+    state.weather.fetchedAtAlertsMs = Date.now();
+  } catch (err) {
+    state.weather.alerts = null;
+    state.weather.alertsError = err?.message || String(err);
+  } finally {
+    state.weather.fetchingAlerts = false;
+    render();
+  }
+};
+
+const renderWeatherSidebar = () => {
+  const zip = _normalizeZip(state.weather.zip);
+  const zipOk = zip.length === 5;
+
+  // Kick off refresh in the background when on list view.
+  if (zipOk) {
+    fetchWeatherForecast().catch((e) => console.error("weather forecast fetch failed", e));
+    fetchWeatherAlerts().catch((e) => console.error("weather alerts fetch failed", e));
+  }
+
+  const card = (title, bodyChildren, titleClass = "", collapseKey = null) => {
+    const isCollapsed = collapseKey ? !!state.ui[collapseKey] : false;
+    const toggleBtn = collapseKey
+      ? el(
+          "button",
+          {
+            class:
+              "rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+            title: isCollapsed ? "Show" : "Hide",
+            "aria-label": isCollapsed ? "Show" : "Hide",
+            onclick: () => {
+              state.ui[collapseKey] = !state.ui[collapseKey];
+              render();
+            },
+          },
+          [isCollapsed ? "Show" : "Hide"]
+        )
+      : null;
+
+    return el(
+      "div",
+      { class: "rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" },
+      [
+        el("div", { class: "flex items-center justify-between gap-2" }, [
+          el("div", { class: `text-sm font-semibold ${titleClass}`.trim() }, [title]),
+          toggleBtn,
+        ].filter(Boolean)),
+        ...(!isCollapsed ? bodyChildren : []),
+      ]
+    );
+  };
+
+  const settingsPrompt = el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, [
+    "Set a 5-digit ZIP in ",
+    el("a", { href: "/#/settings", class: "underline" }, ["Settings"]),
+    ".",
+  ]);
+
+  // Forecast widget
+  const forecastBody = zipOk ? [] : [settingsPrompt];
+  if (zipOk && state.weather.fetchingForecast) {
+    forecastBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading forecast…"]));
+  } else if (zipOk && state.weather.forecastError) {
+    forecastBody.push(el("div", { class: "pt-2 text-xs text-red-600 dark:text-red-400" }, ["Forecast unavailable."]));
+  } else if (zipOk && state.weather.forecast?.forecast?.periods?.length) {
+    const label = state.weather.forecast.location;
+    if (label) {
+      forecastBody.push(el("div", { class: "pt-2 text-xs font-medium text-slate-700 dark:text-slate-300" }, [label]));
+    }
+    const periods = state.weather.forecast.forecast.periods.slice(0, 4);
+    for (const p of periods) {
+      forecastBody.push(
+        el("div", { class: "pt-2 text-xs" }, [
+          el("div", { class: "flex items-baseline justify-between gap-2" }, [
+            el("div", { class: "font-semibold text-slate-800 dark:text-slate-200" }, [p.name || ""]),
+            el("div", { class: "text-slate-700 dark:text-slate-300" }, [
+              renderTempLabel(p.temperature, p.temperatureUnit, { isDay: !!p.isDaytime }),
+            ]),
+          ]),
+          el("div", { class: "text-slate-600 dark:text-slate-400" }, [
+            `${weatherEmojiForText(p.shortForecast, { isDay: !!p.isDaytime })}${p.shortForecast ? " " : ""}${p.shortForecast || ""}`,
+          ]),
+        ])
+      );
+    }
+  }
+
+  // Alerts widget
+  const alertsBody = zipOk ? [] : [settingsPrompt.cloneNode(true)];
+  if (zipOk && state.weather.fetchingAlerts) {
+    alertsBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading alerts…"]));
+  } else if (zipOk && state.weather.alertsError) {
+    alertsBody.push(el("div", { class: "pt-2 text-xs text-red-600 dark:text-red-400" }, ["Alerts unavailable."]));
+  } else if (zipOk) {
+    const alertsLabel = state.weather.alerts?.location;
+    if (alertsLabel) {
+      alertsBody.push(el("div", { class: "pt-2 text-xs font-medium text-slate-700 dark:text-slate-300" }, [alertsLabel]));
+    }
+    const items = state.weather.alerts?.alerts?.alerts || [];
+    if (!items.length) {
+      alertsBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["No active alerts."]));
+    } else {
+      for (const a of items.slice(0, 3)) {
+        alertsBody.push(
+          el("div", { class: "pt-2 text-xs" }, [
+            el("div", { class: "font-semibold text-slate-800 dark:text-slate-200" }, [a.event || "Alert"]),
+            el("div", { class: "text-slate-600 dark:text-slate-400" }, [a.headline || ""]),
+          ])
+        );
+      }
+    }
+  }
+
+  const forecastWidget = card(
+    "Weather Forecast",
+    forecastBody,
+    "text-sky-600 dark:text-sky-400",
+    "collapseForecast"
+  );
+  const alertsWidget = card(
+    "Severe Weather Alerts",
+    alertsBody,
+    "text-red-600 dark:text-red-400",
+    "collapseAlerts"
+  );
+
+  // RouteCast (last selected load) lives under the weather widgets.
+  const routecastWidget = renderRouteCastWidget(state.lastSelectedLoadId, { compact: true });
+
+  return el("div", { class: "space-y-3 lg:w-80 lg:flex-shrink-0" }, [
+    forecastWidget,
+    alertsWidget,
+    routecastWidget,
+  ]);
+};
+
+const fetchRouteCast = async (loadId) => {
+  const id = String(loadId || "").trim();
+  if (!id) return;
+  if (state.routecast.fetching && state.routecast.loadId === id) return;
+
+  const now = Date.now();
+  if (
+    state.routecast.loadId === id &&
+    state.routecast.data &&
+    state.routecast.fetchedAtMs &&
+    now - state.routecast.fetchedAtMs < ROUTECAST_TTL_MS
+  ) {
+    return;
+  }
+
+  state.routecast.fetching = true;
+  state.routecast.error = "";
+  state.routecast.loadId = id;
+  try {
+    const payload = await apiGet(`/api/loads/${encodeURIComponent(id)}/routecast`);
+    if (state.routecast.loadId !== id) return;
+    state.routecast.data = payload;
+    state.routecast.fetchedAtMs = Date.now();
+  } catch (err) {
+    state.routecast.data = null;
+    state.routecast.error = err?.message || String(err);
+  } finally {
+    state.routecast.fetching = false;
+    render();
+  }
+};
+
+const renderRouteCastWidget = (loadId, { compact } = { compact: false }) => {
+  const id = String(loadId || "").trim();
+  const isCollapsed = !!state.ui.collapseRouteCast;
+  const titleRow = el(
+    "div",
+    { class: "flex items-center justify-between gap-2" },
+    [
+      el(
+        "div",
+        { class: "text-sm font-semibold text-slate-800 dark:text-slate-200" },
+        [
+          el("img", {
+            src: "/static/images/rc_logo.png",
+            alt: "RouteCast",
+            class: "h-9 w-auto object-contain",
+          }),
+        ]
+      ),
+      el(
+        "button",
+        {
+          class:
+            "rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+          title: isCollapsed ? "Show" : "Hide",
+          "aria-label": isCollapsed ? "Show" : "Hide",
+          onclick: () => {
+            state.ui.collapseRouteCast = !state.ui.collapseRouteCast;
+            render();
+          },
+        },
+        [isCollapsed ? "Show" : "Hide"]
+      ),
+    ]
+  );
+
+  const wrap = el(
+    "div",
+    {
+      class:
+        "rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900",
+    },
+    [titleRow]
+  );
+
+  if (isCollapsed) return wrap;
+
+  if (!id) {
+    wrap.appendChild(
+      el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Select a load to see RouteCast."])
+    );
+    return wrap;
+  }
+
+  if (!state.routecast.fetching && (state.routecast.loadId !== id || (!state.routecast.data && !state.routecast.error))) {
+    fetchRouteCast(id).catch((e) => console.error("routecast fetch failed", e));
+  }
+
+  if (state.routecast.fetching && state.routecast.loadId === id) {
+    wrap.appendChild(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading RouteCast…"]));
+    return wrap;
+  }
+
+  if (state.routecast.error && state.routecast.loadId === id) {
+    wrap.appendChild(el("div", { class: "pt-2 text-xs text-red-600 dark:text-red-400" }, ["RouteCast unavailable."]));
+    return wrap;
+  }
+
+  const rc = state.routecast.data;
+  if (!rc) {
+    wrap.appendChild(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["RouteCast not available."]));
+    return wrap;
+  }
+
+  const endpointBlock = (label, loc) => {
+    const current = loc?.current;
+    const line1 = `${loc.city}, ${loc.state}`;
+    const when = current?.timestamp ? new Date(current.timestamp) : new Date();
+    const isDay = isSunUpAt(loc?.lat, loc?.lon, when);
+    let tempEl = null;
+    if (current?.temperature_f !== null && current?.temperature_f !== undefined) {
+      tempEl = renderTempLabel(current.temperature_f, "F", { isDay: isDay === null ? undefined : isDay });
+    } else if (current?.temperature_c !== null && current?.temperature_c !== undefined) {
+      tempEl = renderTempLabel(current.temperature_c, "C", { isDay: isDay === null ? undefined : isDay });
+    }
+    const text = current?.text || "";
+    const emoji = weatherEmojiForText(text, { isDay: isDay === null ? undefined : isDay });
+    return el("div", { class: compact ? "" : "pt-2" }, [
+      el("div", { class: "text-xs font-semibold text-slate-600 dark:text-slate-400" }, [label]),
+      el("div", { class: "pt-1 text-xs font-medium text-slate-800 dark:text-slate-200" }, [line1]),
+      current
+        ? el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, [
+            tempEl ? el("span", {}, [tempEl]) : null,
+            tempEl && text ? " • " : "",
+            `${emoji}${emoji && text ? " " : ""}${text}`,
+          ].filter((x) => x !== null && x !== undefined && x !== ""))
+        : el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, ["Current conditions unavailable."]),
+    ]);
+  };
+
+  wrap.appendChild(
+    el(compact ? "div" : "div", { class: compact ? "pt-2 grid gap-2" : "pt-2 grid gap-2" }, [
+      endpointBlock("Origin", rc.origin),
+      endpointBlock("Destination", rc.destination),
+    ])
+  );
+
+  const alerts = rc.route_alerts?.alerts || [];
+  const alertCount = rc.route_alerts?.count ?? alerts.length;
+  wrap.appendChild(el("div", { class: "pt-3 text-xs font-semibold text-slate-600 dark:text-slate-400" }, ["Route alerts"]));
+  if (!alerts.length) {
+    wrap.appendChild(el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, ["No active alerts detected along the route."]));
+  } else {
+    wrap.appendChild(el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, [`${alertCount} active alert(s)`]));
+    for (const a of alerts.slice(0, compact ? 2 : 3)) {
+      const label = a.event || "Alert";
+      const sev = a.severity ? ` • ${a.severity}` : "";
+      wrap.appendChild(el("div", { class: "pt-2 text-xs" }, [
+        el("div", { class: "font-semibold text-slate-800 dark:text-slate-200" }, [`${label}${sev}`]),
+        a.headline ? el("div", { class: "text-slate-600 dark:text-slate-400" }, [a.headline]) : null,
+      ].filter(Boolean)));
+    }
+  }
+
+  return wrap;
 };
 
 const NEWS_TICKER_REFRESH_MS = 5 * 60 * 1000;
@@ -362,17 +920,44 @@ const setMeta = async () => {
   }
 };
 
+const renderFatalError = (root, title, detail) => {
+  const box = el(
+    "div",
+    {
+      class:
+        "mt-3 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200",
+    },
+    [
+      el("div", { class: "font-semibold" }, [title || "Something went wrong"]),
+      detail ? el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, [String(detail)]) : null,
+      el("div", { class: "pt-3" }, [
+        el("a", { href: "/#/", class: "text-sm font-medium underline" }, ["Back to loads"]),
+      ]),
+    ].filter(Boolean)
+  );
+  root.appendChild(box);
+};
+
 const render = async () => {
   const root = document.getElementById("app");
   root.innerHTML = "";
 
-  const route = getHashRoute();
-  if (route.page === "settings") return renderSettings(root);
-  if (route.page === "load" && route.id) return renderDetail(root, route.id);
-  return renderList(root);
+  try {
+    const route = getHashRoute();
+    if (route.page === "settings") return await renderSettings(root);
+    if (route.page === "load" && route.id) return await renderDetail(root, route.id);
+    return await renderList(root);
+  } catch (err) {
+    console.error("Render failed:", err);
+    renderFatalError(root, "Render failed", err?.message || err);
+  }
 };
 
 const renderList = async (root) => {
+  const layout = el("div", { class: "lg:flex lg:gap-4" });
+  const sidebar = renderWeatherSidebar();
+  const main = el("div", { class: "min-w-0 flex-1" });
+
   const top = el("div", { class: "space-y-3" });
 
   const searchRow = el("div", { class: "flex gap-2" }, [
@@ -389,7 +974,7 @@ const renderList = async (root) => {
       "button",
       {
         class:
-          "shrink-0 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900",
+          "shrink-0 rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600",
         onclick: () => render(),
       },
       ["Search"]
@@ -400,13 +985,20 @@ const renderList = async (root) => {
     "button",
     {
       class:
-        "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm font-medium dark:border-slate-800 dark:bg-slate-900",
+        "w-full rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
       onclick: () => {
         state.filtersOpen = !state.filtersOpen;
         render();
       },
     },
-    [state.filtersOpen ? "Hide Filters, Sort & GreenLight" : "Show Filters, Sort & GreenLight"]
+    [
+      state.filtersOpen ? "Hide Filters, Sort & " : "Show Filters, Sort & ",
+      el("img", {
+        src: "/static/images/gl_logo.png",
+        alt: "GreenLight",
+        class: "h-6 w-auto object-contain inline-block align-middle",
+      }),
+    ]
   );
 
   // Terminal workflows toggle button
@@ -424,8 +1016,8 @@ const renderList = async (root) => {
   );
 
   top.appendChild(searchRow);
-  top.appendChild(filtersBtn);
-  top.appendChild(terminalBtn);
+
+  top.appendChild(el("div", { class: "grid grid-cols-2 gap-2" }, [filtersBtn, terminalBtn]));
 
   if (state.filtersOpen) {
     const panels = el(
@@ -446,7 +1038,10 @@ const renderList = async (root) => {
     el("div", { class: "text-xs text-slate-600 dark:text-slate-400" }, ["Results update on Search."]),
   ]);
   top.appendChild(listWrap);
-  root.appendChild(top);
+  main.appendChild(top);
+  layout.appendChild(sidebar);
+  layout.appendChild(main);
+  root.appendChild(layout);
 
   // Fetch scored loads for score display
   await fetchScoredLoads();
@@ -514,12 +1109,25 @@ const renderList = async (root) => {
 
     // Build top reasons (inline, expandable)
     const topReasons = hasScore && scoreData.top_reasons.length > 0
-      ? el("div", { class: "pt-1 text-xs text-slate-500 dark:text-slate-400 truncate" }, [
-          scoreData.top_reasons.slice(0, 2).map((r) => {
+      ? (() => {
+          const reasons = scoreData.top_reasons.slice(0, 2);
+          const children = [];
+          reasons.forEach((r, idx) => {
             const icon = r.direction === "positive" ? "✓" : r.direction === "negative" ? "✗" : "○";
-            return `${icon} ${r.display_name}`;
-          }).join(" • "),
-        ])
+            const colorClass =
+              r.direction === "positive"
+                ? "text-green-600 dark:text-green-400"
+                : r.direction === "negative"
+                ? "text-red-600 dark:text-red-400"
+                : "text-slate-500 dark:text-slate-400";
+
+            children.push(el("span", { class: colorClass }, [`${icon} ${r.display_name}`]));
+            if (idx < reasons.length - 1) {
+              children.push(el("span", { class: "px-1 text-slate-400 dark:text-slate-500" }, ["•"]));
+            }
+          });
+          return el("div", { class: "pt-1 text-xs truncate" }, children);
+        })()
       : null;
 
     // Watchlist toggle button
@@ -541,6 +1149,7 @@ const renderList = async (root) => {
       "a",
       {
         href: `/#/load/${load.id}`,
+        onclick: () => setLastSelectedLoadId(load.id),
         class:
           "block rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800",
       },
@@ -638,7 +1247,13 @@ const renderPrefsPanel = () => {
   };
 
   wrap.appendChild(
-    el("div", { class: "text-sm font-semibold" }, ["GreenLight 🟢"])
+    el("div", { class: "text-sm font-semibold" }, [
+      el("img", {
+        src: "/static/images/gl_logo.png",
+        alt: "GreenLight",
+        class: "h-7 w-auto object-contain",
+      }),
+    ])
   );
 
   wrap.appendChild(
@@ -679,7 +1294,14 @@ const renderPrefsPanel = () => {
         ])
       ),
       row(
-        "Sort by GreenLight",
+        el("span", { class: "inline-flex items-center gap-2" }, [
+          "Sort by",
+          el("img", {
+            src: "/static/images/gl_logo.png",
+            alt: "GreenLight",
+            class: "h-6 w-auto object-contain",
+          }),
+        ]),
         el("div", { class: "flex items-center justify-end gap-4" }, [
           el("label", { class: "flex items-center gap-2 text-sm" }, [
             el("input", {
@@ -710,15 +1332,56 @@ const renderPrefsPanel = () => {
     "button",
     {
       class:
-        "mt-3 w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900",
+        "mt-3 w-full rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600",
       onclick: () => {
         state.prefs = { ...state.prefsDraft };
         render();
       },
     },
-    ["Apply GreenLight parameters"]
+    [
+      "Apply ",
+      el("img", {
+        src: "/static/images/gl_logo.png",
+        alt: "GreenLight",
+        class: "h-6 w-auto object-contain inline-block align-middle",
+      }),
+      " parameters",
+    ]
   );
   wrap.appendChild(applyBtn);
+
+  const saveDefaultBtn = el(
+    "button",
+    {
+      class:
+        "mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+      title: "Save these GreenLight parameters as the default on this device",
+      onclick: () => {
+        state.prefs = { ...state.prefsDraft };
+        setGreenLightDefaults(state.prefs);
+        render();
+      },
+    },
+    ["Save as Default"]
+  );
+  wrap.appendChild(saveDefaultBtn);
+
+  const resetDefaultBtn = el(
+    "button",
+    {
+      class:
+        "mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+      title: "Clear saved GreenLight defaults and reset parameters",
+      onclick: () => {
+        clearGreenLightDefaults();
+        state.prefs = { ...DEFAULT_PREFS };
+        state.prefsDraft = { ...DEFAULT_PREFS };
+        render();
+      },
+    },
+    ["Reset Defaults"]
+  );
+  wrap.appendChild(resetDefaultBtn);
 
   return wrap;
 };
@@ -918,7 +1581,7 @@ const renderFiltersPanel = () => {
         "button",
         {
           class:
-            "w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900",
+            "w-full rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600",
           onclick: () => render(),
         },
         ["Apply"]
@@ -926,11 +1589,54 @@ const renderFiltersPanel = () => {
     ])
   );
 
+  wrap.appendChild(
+    el(
+      "button",
+      {
+        class:
+          "mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+        title: "Save these filters/sort as the default on this device",
+        onclick: () => {
+          // Persist only sort + filters; not the free-text search.
+          setFilterDefaults({ ...state.query, q: "" });
+          render();
+        },
+      },
+      ["Save as Default"]
+    )
+  );
+
+  wrap.appendChild(
+    el(
+      "button",
+      {
+        class:
+          "mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+        title: "Clear saved filter defaults and reset filters",
+        onclick: () => {
+          clearFilterDefaults();
+          state.query = { ...DEFAULT_QUERY };
+          render();
+        },
+      },
+      ["Reset Defaults"]
+    )
+  );
+
   return wrap;
 };
 
 const renderDetail = async (root, id) => {
-  const load = await apiGet(`/api/loads/${id}`);
+  let load;
+  try {
+    load = await apiGet(`/api/loads/${id}`);
+  } catch (err) {
+    console.error("Failed to fetch load:", err);
+    const back = el("a", { href: "/#/", class: "text-sm font-medium underline" }, ["← Back"]);
+    root.appendChild(back);
+    renderFatalError(root, "Load not found", "That load ID is missing (try going back to the list).");
+    return;
+  }
   
   // Fetch score for this load
   let scoreData = null;
@@ -944,6 +1650,9 @@ const renderDetail = async (root, id) => {
   // Check watchlist status
   await fetchWatchlist();
   const isWatched = state.watchlist.has(id);
+
+  // Persist last selected load for RouteCast on the main screen
+  setLastSelectedLoadId(id);
 
   const back = el(
     "a",
@@ -969,7 +1678,13 @@ const renderDetail = async (root, id) => {
     : null;
 
   const greenlightBadge = hasActivePrefs() && isGreenLight(load)
-    ? el("span", { class: "ml-2 text-lg" }, ["🟢 GreenLight"])
+    ? el("span", { class: "ml-2 inline-flex items-center" }, [
+        el("img", {
+          src: "/static/images/gl_logo.png",
+          alt: "GreenLight",
+          class: "h-8 w-auto object-contain",
+        }),
+      ])
     : null;
 
   // Top reasons section
@@ -1005,7 +1720,7 @@ const renderDetail = async (root, id) => {
     [isWatched ? "★ Watching" : "☆ Add to Watchlist"]
   );
 
-  const card = el("div", { class: "mt-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" }, [
+  const leftCol = el("div", { class: "min-w-0 flex-1" }, [
     el("div", { class: "flex items-center justify-between gap-2" }, [
       el("div", { class: "text-base font-semibold" }, [
         `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
@@ -1052,6 +1767,14 @@ const renderDetail = async (root, id) => {
     el("div", { class: "pt-3" }, [watchlistBtn]),
   ]);
 
+  const rightCol = el("div", { class: "pt-3 lg:pt-0 lg:w-[28rem] lg:flex-shrink-0" }, [
+    renderRouteCastWidget(id, { compact: false }),
+  ]);
+
+  const card = el("div", { class: "mt-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" }, [
+    el("div", { class: "lg:flex lg:items-start lg:gap-4" }, [leftCol, rightCol]),
+  ]);
+
   root.appendChild(back);
   root.appendChild(card);
 };
@@ -1088,6 +1811,46 @@ const renderSettings = async (root) => {
   ]);
   themeRow.appendChild(themeWrap);
   box.appendChild(themeRow);
+
+  // Weather ZIP override
+  if (!state.weather.zipDraft) state.weather.zipDraft = state.weather.zip || "";
+  const weatherRow = el("div", { class: "text-sm" }, [
+    el("div", { class: "font-semibold" }, ["Weather location"]),
+    el("div", { class: "mt-2 grid gap-2" }, [
+      el("div", { class: "text-xs text-slate-600 dark:text-slate-400" }, [
+        "Set a ZIP code to power the Weather Forecast and Severe Weather Alerts widgets.",
+      ]),
+      el("input", {
+        type: "text",
+        inputmode: "numeric",
+        class: "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-800 dark:bg-slate-950",
+        placeholder: "ZIP (e.g. 75201)",
+        value: state.weather.zipDraft,
+        oninput: (e) => (state.weather.zipDraft = e.target.value),
+      }),
+      el(
+        "button",
+        {
+          class: "w-full rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900",
+          onclick: () => {
+            const z = _normalizeZip(state.weather.zipDraft);
+            state.weather.zip = z;
+            state.weather.zipDraft = z;
+            setWeatherZip(z);
+            state.weather.forecast = null;
+            state.weather.alerts = null;
+            state.weather.forecastError = "";
+            state.weather.alertsError = "";
+            state.weather.fetchedAtForecastMs = 0;
+            state.weather.fetchedAtAlertsMs = 0;
+            render();
+          },
+        },
+        ["Save ZIP"]
+      ),
+    ]),
+  ]);
+  box.appendChild(weatherRow);
 
   const refreshBtn = el(
     "button",
@@ -1169,7 +1932,7 @@ const _buildTickerEntry = (item) => {
   );
   const divider = el("span", { class: "text-slate-200 opacity-70" }, ["—"]);
   const time = timeLabel
-    ? el("span", { class: "ml-1 text-[0.6rem] uppercase tracking-[0.4em] text-slate-200" }, [timeLabel])
+    ? el("span", { class: "text-[0.65rem] text-slate-200 opacity-80" }, [timeLabel])
     : null;
 
   const entry = el(
@@ -1194,7 +1957,15 @@ const _updateGreenlightTicker = (loads = []) => {
 
   if (!greenlightActive) {
     entryBuilders.push(() =>
-      el("span", { class: "text-[0.65rem] text-slate-500" }, ["Set preferred parameters to unlock GreenLight alerts"])
+      el("span", { class: "text-[0.65rem] text-slate-500" }, [
+        "Set preferred parameters to unlock ",
+        el("img", {
+          src: "/static/images/gl_logo.png",
+          alt: "GreenLight",
+          class: "mx-1 h-5 w-auto object-contain inline-block align-middle",
+        }),
+        " alerts",
+      ])
     );
   } else {
     const greenlightLoads = (loads ?? [])
@@ -1203,7 +1974,15 @@ const _updateGreenlightTicker = (loads = []) => {
 
     if (!greenlightLoads.length) {
       entryBuilders.push(() =>
-        el("span", { class: "text-[0.65rem] text-slate-500" }, ["No GreenLight-ready lanes right now"])
+        el("span", { class: "text-[0.65rem] text-slate-500" }, [
+          "No ",
+          el("img", {
+            src: "/static/images/gl_logo.png",
+            alt: "GreenLight",
+            class: "mx-1 h-5 w-auto object-contain inline-block align-middle",
+          }),
+          " lanes right now",
+        ])
       );
     } else {
       for (const load of greenlightLoads) {
@@ -1266,6 +2045,16 @@ const initNewsTicker = () => {
 
 window.addEventListener("hashchange", render);
 applyTheme(getTheme());
-state.prefsDraft = { ...state.prefs };
+state.weather.zip = getWeatherZip();
+state.lastSelectedLoadId = getLastSelectedLoadId();
+{
+  const defaults = getGreenLightDefaults();
+  if (defaults) state.prefs = { ...state.prefs, ...defaults };
+  state.prefsDraft = { ...state.prefs };
+}
+{
+  const defaults = getFilterDefaults();
+  if (defaults) state.query = { ...DEFAULT_QUERY, ...defaults, q: "" };
+}
 setMeta().then(render);
 initNewsTicker();

@@ -4,8 +4,11 @@
 
 ```bash
 cd output/bundles/freightlens_mvp_ui
-python -m uvicorn app.main:app --reload --port 8035
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8035
 ```
+
+- Same-machine: http://127.0.0.1:8035
+- Other device on your LAN: `http://<your-lan-ip>:8035`
 
 ## CLI (POC-first)
 

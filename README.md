@@ -15,10 +15,18 @@ This repository powers the **FreightLens MVP** bundle: a single FastAPI backend 
 ## Run the server
 
 ```bash
+# Localhost-only (default Uvicorn host):
 poetry run python -m uvicorn app.main:app --reload --port 8035
+
+# Local network testing (bind to all interfaces):
+poetry run python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8035
+
+# Or use the helper script (defaults to HOST=0.0.0.0, PORT=8035):
+./scripts/dev_server.sh
 ```
 
-- Visit http://127.0.0.1:8035 to load the UI.
+- Visit http://127.0.0.1:8035 to load the UI from the same machine.
+- For LAN testing, browse to `http://<your-lan-ip>:8035` from another device.
 - The FastAPI backend lives under `app/`, static assets under `static/`, and the UI HTML entrypoint is `static/index.html`.
 
 ## CLI utilities

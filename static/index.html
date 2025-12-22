@@ -80,7 +80,13 @@
   <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 pb-24">
     <section id="greenlight-ticker" class="w-full">
       <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.35em] text-emerald-500">
-        <span class="flex-shrink-0">GreenLight</span>
+        <span class="flex-shrink-0">
+          <img
+            src="/static/images/gl_logo.png"
+            alt="GreenLight"
+            class="h-7 w-auto object-contain"
+          />
+        </span>
         <div class="flex-1 overflow-hidden">
           <div class="greenlight-marquee" role="marquee" aria-live="polite">
             <div id="greenlight-marquee-track" class="greenlight-marquee-track"></div>
@@ -92,11 +98,13 @@
     <div class="max-w-3xl lg:max-w-6xl mx-auto px-4 py-4">
       <header class="flex items-center justify-between gap-3 pb-3">
         <div class="flex items-center gap-3">
-          <img
-            src="/static/images/freightlens-logo.png"
-            alt="FreightLens logo"
-            class="h-12 w-auto object-contain"
-          />
+          <a href="/#/" aria-label="FreightLens home">
+            <img
+              src="/static/images/freightlens-logo.png"
+              alt="FreightLens logo"
+              class="h-12 w-auto object-contain"
+            />
+          </a>
           <div>
             <div class="text-lg font-semibold leading-tight">FreightLens Terminal v0.1.1</div>
             <div id="meta" class="text-xs text-slate-600 dark:text-slate-400"></div>
@@ -109,7 +117,7 @@
     </div>
 
     <section id="news-ticker" class="w-full">
-      <div class="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-200">
+      <div class="mx-auto flex max-w-6xl items-center gap-4 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-200">
         <span class="flex-shrink-0 text-emerald-300">Freight Alerts</span>
         <div class="flex-1 overflow-hidden">
           <div class="news-marquee" role="marquee" aria-live="polite">
