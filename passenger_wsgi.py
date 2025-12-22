@@ -148,47 +148,101 @@ def _with_request_debug(wsgi_app):
             )
 
         # If the request hangs before headers are returned, schedule a stack dump.
-        # This is the fastest way to learn where we're stuck on shared hosting.
+        # IMPORTANT: Passenger often consumes the returned iterable later; the hang may
+        # occur during iteration (after this function returns). So we keep the watchdog
+        # alive until the iterable is exhausted / closed.
         tb_file = None
+        watchdog_armed = False
         try:
             tb_path = _append_log_path("passenger_traceback.log")
             tb_file = open(tb_path, "a", encoding="utf-8")
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
-            tb_file.write(f"\n[{ts}] dump_traceback_later scheduled path={path_info!r} method={request_method!r}\n")
+            tb_file.write(
+                f"\n[{ts}] watchdog arm path={path_info!r} method={request_method!r} script={script_name!r}\n"
+            )
             tb_file.flush()
             faulthandler.dump_traceback_later(15.0, repeat=False, file=tb_file)
+            watchdog_armed = True
         except Exception as e:
-            _debug_log("Failed to schedule faulthandler dump: " + repr(e))
+            _debug_log("Failed to arm faulthandler watchdog: " + repr(e))
 
         def _sr(status, headers, exc_info=None):
             _debug_log(f"REQ status={status} path={path_info!r}")
             try:
-                faulthandler.cancel_dump_traceback_later()
-            except Exception:
-                pass
-            try:
                 if tb_file is not None:
                     tb_file.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] start_response status={status} path={path_info!r}\n")
                     tb_file.flush()
-                    tb_file.close()
             except Exception:
                 pass
             return start_response(status, headers, exc_info)
 
         try:
             result: Iterable[bytes] = wsgi_app(environ, _sr)
-            return result
+            _debug_log(f"REQ wsgi_app returned iterable path={path_info!r}")
+
+            def _cleanup(note: str) -> None:
+                nonlocal watchdog_armed, tb_file
+                try:
+                    if watchdog_armed:
+                        faulthandler.cancel_dump_traceback_later()
+                        watchdog_armed = False
+                except Exception:
+                    pass
+                try:
+                    if tb_file is not None and not tb_file.closed:
+                        tb_file.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] watchdog disarm ({note}) path={path_info!r}\n")
+                        tb_file.flush()
+                        tb_file.close()
+                except Exception:
+                    pass
+
+            # Wrap the iterable so the watchdog stays armed until Passenger actually
+            # consumes the response.
+            def _iter_wrapped():
+                first = True
+                try:
+                    for chunk in result:
+                        if first:
+                            first = False
+                            _debug_log(f"REQ first chunk path={path_info!r} bytes={(len(chunk) if chunk is not None else 'None')} ")
+                        yield chunk
+                finally:
+                    # If the underlying iterable supports close(), call it.
+                    try:
+                        close_fn = getattr(result, "close", None)
+                        if callable(close_fn):
+                            close_fn()
+                    except Exception:
+                        pass
+                    _cleanup("iterable finished")
+
+            class _WrappedIterable:
+                def __iter__(self):
+                    return _iter_wrapped()
+
+                def close(self):
+                    try:
+                        close_fn = getattr(result, "close", None)
+                        if callable(close_fn):
+                            close_fn()
+                    finally:
+                        _cleanup("close()")
+
+            return _WrappedIterable()
         except Exception:
             _debug_log("REQ exception: " + traceback.format_exc().strip())
             raise
         finally:
+            # If we errored before returning an iterable, clean up the watchdog here.
             try:
-                faulthandler.cancel_dump_traceback_later()
+                if watchdog_armed:
+                    faulthandler.cancel_dump_traceback_later()
+                    watchdog_armed = False
             except Exception:
                 pass
             try:
                 if tb_file is not None and not tb_file.closed:
-                    tb_file.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] request finished path={path_info!r}\n")
+                    tb_file.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] watchdog disarm (early-exit) path={path_info!r}\n")
                     tb_file.flush()
                     tb_file.close()
             except Exception:
