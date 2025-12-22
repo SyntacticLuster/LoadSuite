@@ -302,5 +302,5 @@ def _with_request_debug(wsgi_app):
 
 
 # Passenger expects an 'application' callable
-application = _with_request_debug(_build_wsgi_application())
+application = _with_request_debug(None)
 _debug_log("WSGI application ready")
