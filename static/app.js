@@ -394,7 +394,29 @@ const renderWeatherSidebar = () => {
     fetchWeatherAlerts().catch((e) => console.error("weather alerts fetch failed", e));
   }
 
-  const card = (title, bodyChildren, titleClass = "", collapseKey = null) => {
+  const applyZipFromPrompt = () => {
+    const current = _normalizeZip(state.weather.zip);
+    const raw = window.prompt("Enter 5-digit ZIP code", current || "");
+    if (raw === null) return;
+    const next = _normalizeZip(raw);
+    if (next.length !== 5) return;
+
+    setWeatherZip(next);
+    state.weather.zip = next;
+    state.weather.zipDraft = next;
+    state.weather.forecast = null;
+    state.weather.alerts = null;
+    state.weather.forecastError = "";
+    state.weather.alertsError = "";
+    state.weather.fetchedAtForecastMs = 0;
+    state.weather.fetchedAtAlertsMs = 0;
+
+    fetchWeatherForecast().catch((e) => console.error("weather forecast fetch failed", e));
+    fetchWeatherAlerts().catch((e) => console.error("weather alerts fetch failed", e));
+    render();
+  };
+
+  const card = (title, bodyChildren, titleClass = "", collapseKey = null, { showZipChange, locationLabel } = {}) => {
     const isCollapsed = collapseKey ? !!state.ui[collapseKey] : false;
     const toggleBtn = collapseKey
       ? el(
@@ -413,14 +435,43 @@ const renderWeatherSidebar = () => {
         )
       : null;
 
+    const changeZipBtn = showZipChange
+      ? el(
+          "button",
+          {
+            class:
+              "rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+            title: "Change ZIP code",
+            "aria-label": "Change ZIP code",
+            onclick: () => applyZipFromPrompt(),
+          },
+          ["Change"]
+        )
+      : null;
+
+    const subRow =
+      !isCollapsed && changeZipBtn
+        ? el(
+            "div",
+            { class: "flex items-start justify-between gap-2 pt-2" },
+            [
+              locationLabel
+                ? el("div", { class: "text-xs font-medium text-slate-700 dark:text-slate-300" }, [locationLabel])
+                : el("div", { class: "text-xs" }, [""]),
+              changeZipBtn,
+            ]
+          )
+        : null;
+
     return el(
       "div",
       { class: "rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" },
       [
-        el("div", { class: "flex items-center justify-between gap-2" }, [
+        el("div", { class: "flex items-start justify-between gap-2" }, [
           el("div", { class: `text-sm font-semibold ${titleClass}`.trim() }, [title]),
           toggleBtn,
         ].filter(Boolean)),
+        subRow,
         ...(!isCollapsed ? bodyChildren : []),
       ]
     );
@@ -434,15 +485,14 @@ const renderWeatherSidebar = () => {
 
   // Forecast widget
   const forecastBody = zipOk ? [] : [settingsPrompt];
+  let forecastLocationLabel = "";
   if (zipOk && state.weather.fetchingForecast) {
     forecastBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading forecast…"]));
   } else if (zipOk && state.weather.forecastError) {
     forecastBody.push(el("div", { class: "pt-2 text-xs text-red-600 dark:text-red-400" }, ["Forecast unavailable."]));
   } else if (zipOk && state.weather.forecast?.forecast?.periods?.length) {
     const label = state.weather.forecast.location;
-    if (label) {
-      forecastBody.push(el("div", { class: "pt-2 text-xs font-medium text-slate-700 dark:text-slate-300" }, [label]));
-    }
+    if (label) forecastLocationLabel = label;
     const periods = state.weather.forecast.forecast.periods.slice(0, 4);
     for (const p of periods) {
       forecastBody.push(
@@ -463,15 +513,14 @@ const renderWeatherSidebar = () => {
 
   // Alerts widget
   const alertsBody = zipOk ? [] : [settingsPrompt.cloneNode(true)];
+  let alertsLocationLabel = "";
   if (zipOk && state.weather.fetchingAlerts) {
     alertsBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading alerts…"]));
   } else if (zipOk && state.weather.alertsError) {
     alertsBody.push(el("div", { class: "pt-2 text-xs text-red-600 dark:text-red-400" }, ["Alerts unavailable."]));
   } else if (zipOk) {
     const alertsLabel = state.weather.alerts?.location;
-    if (alertsLabel) {
-      alertsBody.push(el("div", { class: "pt-2 text-xs font-medium text-slate-700 dark:text-slate-300" }, [alertsLabel]));
-    }
+    if (alertsLabel) alertsLocationLabel = alertsLabel;
     const items = state.weather.alerts?.alerts?.alerts || [];
     if (!items.length) {
       alertsBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["No active alerts."]));
@@ -491,13 +540,15 @@ const renderWeatherSidebar = () => {
     "Weather Forecast",
     forecastBody,
     "text-sky-600 dark:text-sky-400",
-    "collapseForecast"
+    "collapseForecast",
+    { showZipChange: true, locationLabel: forecastLocationLabel }
   );
   const alertsWidget = card(
     "Severe Weather Alerts",
     alertsBody,
     "text-red-600 dark:text-red-400",
-    "collapseAlerts"
+    "collapseAlerts",
+    { showZipChange: true, locationLabel: alertsLocationLabel }
   );
 
   // RouteCast (last selected load) lives under the weather widgets.
@@ -1187,7 +1238,13 @@ const renderList = async (root) => {
                   ? "text-lg leading-none text-green-400 dark:text-green-300"
                   : "text-lg leading-none invisible",
               },
-              ["🟢"]
+              [
+                el("img", {
+                  src: "/static/images/gl_glyph.png",
+                  alt: "GreenLight",
+                  class: "inline-block align-middle h-4 w-4",
+                }),
+              ]
             ),
           ]
         ),
