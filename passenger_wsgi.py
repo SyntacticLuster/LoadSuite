@@ -9,6 +9,9 @@ import os
 import sys
 import time
 import traceback
+import faulthandler
+import json
+from typing import Iterable
 
 # Add application directory to Python path
 app_dir = os.path.dirname(__file__)
@@ -33,6 +36,23 @@ def _debug_log(message: str) -> None:
     except Exception:
         # Avoid breaking app load because logging failed.
         pass
+
+
+def _append_log_path(filename: str) -> str:
+    tmp_dir = os.path.join(app_dir, "tmp")
+    os.makedirs(tmp_dir, exist_ok=True)
+    return os.path.join(tmp_dir, filename)
+
+
+def _write_json_response(start_response, *, status: str, payload: dict) -> list[bytes]:
+    body = (json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
+    headers = [
+        ("Content-Type", "application/json; charset=utf-8"),
+        ("Content-Length", str(len(body))),
+        ("Cache-Control", "no-store"),
+    ]
+    start_response(status, headers)
+    return [body]
 
 # Load environment variables from .env file
 try:
@@ -94,15 +114,85 @@ def _with_request_debug(wsgi_app):
             f"content_length={content_length!r} content_type={content_type!r}"
         )
 
+        # Pure WSGI probe endpoint. This bypasses a2wsgi/FastAPI entirely.
+        # If this returns but /api/health hangs, the problem is almost certainly
+        # inside the ASGI<->WSGI bridge or FastAPI lifespan.
+        if path_info == "/api/wsgi-health":
+            return _write_json_response(
+                start_response,
+                status="200 OK",
+                payload={
+                    "status": "ok",
+                    "probe": "wsgi",
+                    "script_name": script_name,
+                    "path": path_info,
+                    "method": request_method,
+                },
+            )
+
+        # Optional bypass of the main health endpoint for diagnosis.
+        # Enable by setting WSGI_HEALTH_BYPASS=1 in the environment.
+        if path_info == "/api/health" and os.environ.get("WSGI_HEALTH_BYPASS") in {"1", "true", "TRUE", "yes", "YES"}:
+            _debug_log("REQ bypassing /api/health via WSGI_HEALTH_BYPASS")
+            return _write_json_response(
+                start_response,
+                status="200 OK",
+                payload={
+                    "status": "healthy",
+                    "bypassed": True,
+                    "probe": "wsgi",
+                    "script_name": script_name,
+                    "path": path_info,
+                    "method": request_method,
+                },
+            )
+
+        # If the request hangs before headers are returned, schedule a stack dump.
+        # This is the fastest way to learn where we're stuck on shared hosting.
+        tb_file = None
+        try:
+            tb_path = _append_log_path("passenger_traceback.log")
+            tb_file = open(tb_path, "a", encoding="utf-8")
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            tb_file.write(f"\n[{ts}] dump_traceback_later scheduled path={path_info!r} method={request_method!r}\n")
+            tb_file.flush()
+            faulthandler.dump_traceback_later(15.0, repeat=False, file=tb_file)
+        except Exception as e:
+            _debug_log("Failed to schedule faulthandler dump: " + repr(e))
+
         def _sr(status, headers, exc_info=None):
             _debug_log(f"REQ status={status} path={path_info!r}")
+            try:
+                faulthandler.cancel_dump_traceback_later()
+            except Exception:
+                pass
+            try:
+                if tb_file is not None:
+                    tb_file.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] start_response status={status} path={path_info!r}\n")
+                    tb_file.flush()
+                    tb_file.close()
+            except Exception:
+                pass
             return start_response(status, headers, exc_info)
 
         try:
-            return wsgi_app(environ, _sr)
+            result: Iterable[bytes] = wsgi_app(environ, _sr)
+            return result
         except Exception:
             _debug_log("REQ exception: " + traceback.format_exc().strip())
             raise
+        finally:
+            try:
+                faulthandler.cancel_dump_traceback_later()
+            except Exception:
+                pass
+            try:
+                if tb_file is not None and not tb_file.closed:
+                    tb_file.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] request finished path={path_info!r}\n")
+                    tb_file.flush()
+                    tb_file.close()
+            except Exception:
+                pass
 
     return _app
 

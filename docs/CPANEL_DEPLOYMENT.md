@@ -191,25 +191,19 @@ Make sure the adapter dependency is installed in your cPanel app environment:
 pip install a2wsgi
 ```
 
-Create `passenger_wsgi.py` in your LoadSuite directory:
+This repo already includes a production-ready Passenger entrypoint at `passenger_wsgi.py` which:
 
-```python
-import sys
-import os
+- Loads `.env` (if `python-dotenv` is installed)
+- Wraps FastAPI (ASGI) with `a2wsgi.ASGIMiddleware` to produce a WSGI `application`
+- Writes debug logs to `~/apps/LoadSuite/tmp/passenger_debug.log`
 
-# Add app directory to path
-sys.path.insert(0, os.path.dirname(__file__))
+### Debugging request hangs (high-leverage)
 
-# Load environment variables
-from dotenv import load_dotenv
-load_dotenv()
+If requests reach Passenger but hang before headers are returned:
 
-# Import the FastAPI app
-from app.main import app
-
-# Passenger expects 'application'
-application = app
-```
+- Check `~/apps/LoadSuite/tmp/passenger_traceback.log` for a Python stack dump (triggered automatically after ~15s per request).
+- Hit `https://apps.orbitsuite.cloud/FreightLens/api/wsgi-health` to confirm the WSGI stack can return a response without entering the ASGI bridge.
+- Use `python scripts/wsgi_sanity.py probe --script-name /FreightLens --path /api/health` on the server to test the WSGI callable entirely in-process (no LiteSpeed).
 
 ### Option B: Run with Gunicorn (if you have process control)
 
