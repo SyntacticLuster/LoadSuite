@@ -78,7 +78,21 @@ def _with_request_debug(wsgi_app):
         script_name = environ.get("SCRIPT_NAME", "")
         request_method = environ.get("REQUEST_METHOD", "")
 
-        _debug_log(f"REQ start method={request_method} script={script_name!r} path={path_info!r}")
+        # Some shared-hosting WSGI stacks provide an input stream that will block
+        # unless CONTENT_LENGTH is set. a2wsgi will read the request body to
+        # bridge WSGI->ASGI; for methods that should have no body, force 0.
+        content_length = (environ.get("CONTENT_LENGTH") or "").strip()
+        if request_method in {"GET", "HEAD", "DELETE", "OPTIONS"} and not content_length:
+            environ["CONTENT_LENGTH"] = "0"
+            content_length = "0"
+
+        content_type = (environ.get("CONTENT_TYPE") or "").strip()
+
+        _debug_log(
+            "REQ start "
+            f"method={request_method} script={script_name!r} path={path_info!r} "
+            f"content_length={content_length!r} content_type={content_type!r}"
+        )
 
         def _sr(status, headers, exc_info=None):
             _debug_log(f"REQ status={status} path={path_info!r}")
