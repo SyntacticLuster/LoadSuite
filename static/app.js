@@ -623,7 +623,7 @@ const renderRouteCastWidget = (loadId, { compact } = { compact: false }) => {
         { class: "text-sm font-semibold text-slate-800 dark:text-slate-200" },
         [
           el("img", {
-            src: "/static/images/rc_logo.png",
+            src: toAppUrl("/static/images/rc_logo.png"),
             alt: "RouteCast",
             class: "h-9 w-auto object-contain",
           }),
@@ -1056,7 +1056,7 @@ const renderList = async (root) => {
       state.filtersOpen ? "Hide Filters, Sort &  " : "Show Filters, Sort &  ",
       el("span", { class: "inline-flex items-center align-middle" }, [
         el("img", {
-          src: "/static/images/gl_glyph.png",
+          src: toAppUrl("/static/images/gl_glyph.png"),
           alt: "GreenLight",
           class: "inline-block align-middle h-4 w-4 transform scale-150",
         }),
@@ -1194,7 +1194,7 @@ const renderList = async (root) => {
             },
             [
               el("img", {
-                src: "/static/images/gl_glyph.png",
+                src: toAppUrl("/static/images/gl_glyph.png"),
                 alt: "GreenLight",
                 class: "inline-block align-middle h-4 w-4 transform scale-150",
               }),
@@ -1341,7 +1341,7 @@ const renderPrefsPanel = () => {
     el("div", { class: "text-sm font-semibold" }, [
       el("span", { class: "inline-flex items-center align-middle" }, [
         el("img", {
-          src: "/static/images/gl_glyph.png",
+          src: toAppUrl("/static/images/gl_glyph.png"),
           alt: "GreenLight",
           class: "inline-block align-middle h-4 w-4 transform scale-150",
         }),
@@ -1399,7 +1399,7 @@ const renderPrefsPanel = () => {
           "Sort by",
           el("span", { class: "inline-flex items-center" }, [
             el("img", {
-              src: "/static/images/gl_glyph.png",
+              src: toAppUrl("/static/images/gl_glyph.png"),
               alt: "GreenLight",
               class: "inline-block align-middle h-4 w-4 transform scale-150",
             }),
@@ -1453,7 +1453,7 @@ const renderPrefsPanel = () => {
       "Apply",
       el("span", { class: "inline-flex items-center align-middle" }, [
         el("img", {
-          src: "/static/images/gl_glyph.png",
+          src: toAppUrl("/static/images/gl_glyph.png"),
           alt: "GreenLight",
           class: "inline-block align-middle h-4 w-4 transform scale-150",
         }),
@@ -1801,7 +1801,7 @@ const renderDetail = async (root, id) => {
   const greenlightBadge = scoreBadge && hasActivePrefs() && isGreenLight(load)
     ? el("span", { class: "mr-1 inline-flex items-center" }, [
         el("img", {
-          src: "/static/images/gl_glyph.png",
+          src: toAppUrl("/static/images/gl_glyph.png"),
           alt: "GreenLight",
           class: "inline-block align-middle h-4 w-4 transform scale-150",
         }),
@@ -2081,7 +2081,7 @@ const _updateGreenlightTicker = (loads = []) => {
       el("span", { class: "text-[0.65rem] text-slate-500" }, [
         "Set preferred parameters to unlock ",
         el("img", {
-          src: "/static/images/gl_logo.png",
+          src: toAppUrl("/static/images/gl_logo.png"),
           alt: "GreenLight",
           class: "mx-1 h-5 w-auto object-contain inline-block align-middle",
         }),
@@ -2098,7 +2098,7 @@ const _updateGreenlightTicker = (loads = []) => {
         el("span", { class: "text-[0.65rem] text-slate-500" }, [
           "No ",
           el("img", {
-            src: "/static/images/gl_logo.png",
+            src: toAppUrl("/static/images/gl_logo.png"),
             alt: "GreenLight",
             class: "mx-1 h-5 w-auto object-contain inline-block align-middle",
           }),
