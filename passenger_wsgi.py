@@ -9,6 +9,8 @@ import os
 import sys
 import time
 import traceback
+import asyncio
+import threading
 
 # Add application directory to Python path
 app_dir = os.path.dirname(__file__)
@@ -52,25 +54,57 @@ except Exception:
     raise
 
 
-def _build_wsgi_application():
+_wsgi_app = None
+_wsgi_app_pid: int | None = None
+_wsgi_app_lock = threading.Lock()
+
+
+def _create_wsgi_application():
     """Build a WSGI callable for Passenger.
 
-    cPanel's "Setup Python App" uses Phusion Passenger in WSGI mode.
-    FastAPI is ASGI, so we adapt it.
+    Passenger may pre-fork worker processes. Threads created before a fork can
+    become inert/broken in the child. a2wsgi's default behavior creates its own
+    loop thread; on Passenger this can deadlock.
+
+    We instead create a dedicated asyncio loop per PID and rebuild the adapter
+    if the process ID changes.
     """
 
     try:
         from a2wsgi import ASGIMiddleware
     except Exception as e:  # pragma: no cover
         _debug_log("Missing dependency a2wsgi: " + repr(e))
-        # Passenger will surface this as a 500; the details should land in the app error log.
         raise RuntimeError(
             "Missing dependency 'a2wsgi'. Install it in the app virtualenv (e.g. pip install a2wsgi)."
         ) from e
 
     _debug_log("Building ASGI->WSGI adapter")
-    return ASGIMiddleware(asgi_app)
 
+    loop = asyncio.new_event_loop()
+
+    def _run_loop() -> None:
+        try:
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+        except Exception:
+            _debug_log("ASGI loop thread crashed: " + traceback.format_exc().strip())
+            raise
+
+    threading.Thread(target=_run_loop, daemon=True).start()
+    _debug_log("ASGI loop thread started")
+
+    return ASGIMiddleware(asgi_app, loop=loop)
+
+
+def _get_wsgi_application():
+    global _wsgi_app, _wsgi_app_pid
+    pid = os.getpid()
+    with _wsgi_app_lock:
+        if _wsgi_app is None or _wsgi_app_pid != pid:
+            _debug_log(f"(re)initializing WSGI adapter for pid={pid}")
+            _wsgi_app = _create_wsgi_application()
+            _wsgi_app_pid = pid
+        return _wsgi_app
 
 def _with_request_debug(wsgi_app):
     def _app(environ, start_response):
@@ -99,7 +133,8 @@ def _with_request_debug(wsgi_app):
             return start_response(status, headers, exc_info)
 
         try:
-            return wsgi_app(environ, _sr)
+            resolved_app = _get_wsgi_application() if wsgi_app is None else wsgi_app
+            return resolved_app(environ, _sr)
         except Exception:
             _debug_log("REQ exception: " + traceback.format_exc().strip())
             raise
@@ -108,5 +143,5 @@ def _with_request_debug(wsgi_app):
 
 
 # Passenger expects an 'application' callable
-application = _with_request_debug(_build_wsgi_application())
+application = _with_request_debug(None)
 _debug_log("WSGI application ready")

@@ -191,25 +191,9 @@ Make sure the adapter dependency is installed in your cPanel app environment:
 pip install a2wsgi
 ```
 
-Create `passenger_wsgi.py` in your LoadSuite directory:
-
-```python
-import sys
-import os
-
-# Add app directory to path
-sys.path.insert(0, os.path.dirname(__file__))
-
-# Load environment variables
-from dotenv import load_dotenv
-load_dotenv()
-
-# Import the FastAPI app
-from app.main import app
-
-# Passenger expects 'application'
-application = app
-```
+You do **not** need to create this file manually — the repo already includes `passenger_wsgi.py`.
+It adapts FastAPI (ASGI) to Passenger (WSGI) and includes a fork-safe event loop setup for
+Passenger/LiteSpeed deployments.
 
 ### Option B: Run with Gunicorn (if you have process control)
 
