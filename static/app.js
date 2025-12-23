@@ -1351,6 +1351,10 @@ const renderList = async (root) => {
     const greenlightActive = hasActivePrefs();
     const greenlightOk = greenlightActive ? isGreenLight(load) : false;
 
+    // Color semantics: only GreenLight loads get the "good = green" treatment.
+    // For non-GreenLight loads, use teal so green remains a true endorsement.
+    const okTextClass = greenlightOk ? "text-green-600 dark:text-green-400" : "text-teal-600 dark:text-teal-400";
+
     // Get score data if available
     const scoreData = state.scoredLoads[load.id];
     const hasScore = !!scoreData;
@@ -1359,7 +1363,7 @@ const renderList = async (root) => {
 
     const maybeClass = (ok, defaultClass) => {
       if (ok === null) return defaultClass;
-      return ok ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+      return ok ? okTextClass : "text-red-600 dark:text-red-400";
     };
 
     const rpmTone = (() => {
@@ -1437,7 +1441,7 @@ const renderList = async (root) => {
             const icon = r.direction === "positive" ? "✓" : r.direction === "negative" ? "✗" : "○";
             const colorClass =
               r.direction === "positive"
-                ? "text-green-600 dark:text-green-400"
+                ? okTextClass
                 : r.direction === "negative"
                 ? "text-red-600 dark:text-red-400"
                 : "text-slate-500 dark:text-slate-400";
