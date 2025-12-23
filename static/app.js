@@ -580,8 +580,7 @@ const renderWeatherSidebar = () => {
       forecastAlways.push(
         el("div", { class: "pt-3" }, [
           el("div", { class: "text-xs font-semibold text-slate-600 dark:text-slate-400" }, ["Current Conditions"]),
-          el("div", { class: "pt-1 flex items-baseline justify-between gap-2 text-xs" }, [
-            el("div", { class: "font-semibold text-slate-800 dark:text-slate-200" }, [current.name || "Now"]),
+          el("div", { class: "pt-1 flex items-baseline justify-end gap-2 text-xs" }, [
             el("div", { class: "text-slate-700 dark:text-slate-300" }, [
               renderTempLabel(current.temperature, current.temperatureUnit, { isDay: !!current.isDaytime }),
             ]),
@@ -1169,7 +1168,7 @@ const renderList = async (root) => {
       "button",
       {
         class:
-          "shrink-0 rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600",
+          "shrink-0 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
         onclick: () => render(),
       },
       ["Search"]
@@ -1195,7 +1194,7 @@ const renderList = async (root) => {
     "button",
     {
       class:
-        "flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+        "flex-1 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
       onclick: () => {
         state.terminalPanelOpen = !state.terminalPanelOpen;
         render();
