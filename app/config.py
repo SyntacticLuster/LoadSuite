@@ -8,7 +8,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import List, Literal, Optional
 
-from pydantic import Field, PostgresDsn
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,9 +23,9 @@ class Settings(BaseSettings):
     )
     
     # Database
-    database_url: PostgresDsn = Field(
-        default="postgresql://localhost:5432/loadsuite",
-        description="PostgreSQL connection URL"
+    database_url: str = Field(
+        default="",
+        description="Database connection URL (MySQL when USE_DATABASE=true)"
     )
     db_pool_min_size: int = Field(default=2, ge=1, le=20)
     db_pool_max_size: int = Field(default=10, ge=1, le=100)
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Feature flags
     use_database: bool = Field(
         default=False,
-        description="Use PostgreSQL for persistence (False = in-memory)"
+        description="Use MySQL for persistence (False = in-memory)"
     )
 
     # Ingestion (MVP backbone; in-memory by default)

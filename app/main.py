@@ -100,10 +100,27 @@ def _likely_worker_count() -> int | None:
 
 def _build_default_ctx() -> AppContext:
     watchlist_store: WatchlistStore
-    if settings.environment in ("production", "staging") and not settings.use_database:
-        watchlist_store = PersistentWatchlistStore(BASE_DIR / ".runtime" / "watchlist.json")
+    if settings.use_database:
+        from .mysql_stores import (
+            MySQLAlertRulesStore,
+            MySQLFilterPresetsStore,
+            MySQLPreferencesStore,
+            MySQLWatchlistStore,
+        )
+
+        preferences_store = MySQLPreferencesStore()
+        watchlist_store = MySQLWatchlistStore()
+        alert_rules_store = MySQLAlertRulesStore()
+        filter_presets_store = MySQLFilterPresetsStore()
     else:
-        watchlist_store = WatchlistStore()
+        if settings.environment in ("production", "staging"):
+            watchlist_store = PersistentWatchlistStore(BASE_DIR / ".runtime" / "watchlist.json")
+        else:
+            watchlist_store = WatchlistStore()
+
+        preferences_store = PreferencesStore()
+        alert_rules_store = AlertRulesStore()
+        filter_presets_store = FilterPresetsStore()
 
     return AppContext(
         dataset=generate_synthetic_loads(settings.synthetic_load_count),
@@ -116,10 +133,10 @@ def _build_default_ctx() -> AppContext:
         ),
         ingestion_manager=None,
         ingestion_task=None,
-        preferences_store=PreferencesStore(),
+        preferences_store=preferences_store,
         watchlist_store=watchlist_store,
-        alert_rules_store=AlertRulesStore(),
-        filter_presets_store=FilterPresetsStore(),
+        alert_rules_store=alert_rules_store,
+        filter_presets_store=filter_presets_store,
     )
 
 
