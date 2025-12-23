@@ -47,6 +47,13 @@ Use the smoke test to ensure the API responds and the dataset loads:
 poetry run python smoke_test.py
 ```
 
+## Metrics endpoint
+
+- `/metrics` exposes Prometheus-format stats (`text/plain; version=0.0.4; charset=utf-8`).
+- Scrape it with Prometheus; do not leave it on the public internet.
+- Restrict access via private ingress, VPN, IP allowlist, or auth at deploy time.
+- The payload includes operational metadata (paths, status codes), so treat it as internal-only.
+
 ## Ingestion (optional)
 
 The app ships with an **in-memory ingestion framework** (connectors → normalization → dedupe/merge → retention). It’s off by default.

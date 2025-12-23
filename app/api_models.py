@@ -312,7 +312,7 @@ class TrustReason(BaseModel):
     factor: str
     label: str
     contribution: int
-    details: str = ""
+    details: dict[str, Any]
 
 
 class TrustResponse(BaseModel):

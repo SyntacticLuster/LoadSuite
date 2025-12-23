@@ -292,7 +292,14 @@ def _compute_trust(load: Load, provenance: Provenance | None, now: datetime) -> 
     reasons: list[TrustReason] = []
 
     def _add_reason(factor: str, label: str, contribution: int, details: str) -> None:
-        reasons.append(TrustReason(factor=factor, label=label, contribution=contribution, details=details))
+        reasons.append(
+            TrustReason(
+                factor=factor,
+                label=label,
+                contribution=contribution,
+                details={"message": details},
+            )
+        )
 
     score = 60
 

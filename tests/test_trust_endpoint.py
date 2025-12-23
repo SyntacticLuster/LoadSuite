@@ -52,9 +52,11 @@ def test_trust_response_excludes_sensitive_fields():
     resp = client.get(f"/api/loads/{load.id}/trust").json()
 
     assert set(resp.keys()) == {"load_id", "confidence_score", "confidence_bucket", "confidence_reasons"}
+    assert resp["confidence_bucket"] in {"high", "medium", "low"}
 
     for reason in resp["confidence_reasons"]:
         assert "factor" in reason and "contribution" in reason and "details" in reason
+        assert isinstance(reason["details"], dict) and reason["details"]
 
 
 def test_trust_penalizes_stale_provenance():
