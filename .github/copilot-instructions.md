@@ -33,6 +33,9 @@
 - Tests: `poetry run pytest`
 - Smoke test: `poetry run python smoke_test.py`
 - CLI (shares filters/import parsing): `poetry run python cli.py list --sort rpm_desc --limit 10`
+- Deploy (cPanel/Passenger, one-shot): `DEPLOY_SSH_TARGET=loadsuite-prod DEPLOY_YES=1 ./scripts/deploy_cpanel.sh`
+  - This script stages+commits ALL changes (including untracked), pushes `main`, SSHes to the server, resets to `origin/main`, and touches `tmp/restart.txt`.
+  - Default behavior: when the user says “deploy”, run this (don’t ask for the command again unless they specify a different target).
 
 ## Agent vs. Long-form manifesto
 - The short `Sage` agent in `.github/agents/Sage.agent.md` distills the behavior Copilot should follow when you select it.

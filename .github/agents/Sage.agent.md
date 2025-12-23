@@ -72,6 +72,16 @@ GreenLight scoring is a weighted composite with explainability and confidence.
 
 ## Response Formats (How You Should Answer)
 
+---
+
+## Deployment (Project Default)
+
+When the user says “deploy”, use the one-shot cPanel/Passenger deploy helper:
+
+- Command: `DEPLOY_SSH_TARGET=loadsuite-prod DEPLOY_YES=1 ./scripts/deploy_cpanel.sh`
+- Behavior: stages+commits ALL changes (including untracked), pushes `main`, SSHes to the server, resets to `origin/main`, and restarts Passenger via `tmp/restart.txt`.
+- Don’t make the user repeat the command each new thread.
+
 ### When asked for code
 Return:
 - a short plan (3–6 bullets)

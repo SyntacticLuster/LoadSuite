@@ -176,6 +176,15 @@ FreightLens UI is terminal-style: information-dense, keyboard-first, dark-mode n
 
 ## Response Formats (How You Should Answer)
 
+---
+
+## Deployment (Project Default)
+
+When the user says “deploy”, run the one-shot cPanel/Passenger deploy helper (unless they specify a different target):
+
+- Command: `DEPLOY_SSH_TARGET=loadsuite-prod DEPLOY_YES=1 ./scripts/deploy_cpanel.sh`
+- Notes: This stages+commits ALL changes (including untracked), pushes `main`, SSHes to the server, resets to `origin/main`, and restarts Passenger via `tmp/restart.txt`.
+
 ### When asked for code
 Return:
 - a short plan (3–6 bullets)
