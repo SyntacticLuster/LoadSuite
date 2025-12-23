@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import random
+import math
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -12,19 +13,19 @@ from typing import Iterable, List, Tuple
 from .models import Broker, Load, Location
 
 
-_CITIES: list[tuple[str, str]] = [
-    ("Atlanta", "GA"),
-    ("Chicago", "IL"),
-    ("Dallas", "TX"),
-    ("Denver", "CO"),
-    ("Kansas City", "MO"),
-    ("Los Angeles", "CA"),
-    ("Miami", "FL"),
-    ("Nashville", "TN"),
-    ("New York", "NY"),
-    ("Phoenix", "AZ"),
-    ("Salt Lake City", "UT"),
-    ("Seattle", "WA"),
+_CITIES: list[tuple[str, str, float, float]] = [
+    ("Atlanta", "GA", 33.7490, -84.3880),
+    ("Chicago", "IL", 41.8781, -87.6298),
+    ("Dallas", "TX", 32.7767, -96.7970),
+    ("Denver", "CO", 39.7392, -104.9903),
+    ("Kansas City", "MO", 39.0997, -94.5786),
+    ("Los Angeles", "CA", 34.0522, -118.2437),
+    ("Miami", "FL", 25.7617, -80.1918),
+    ("Nashville", "TN", 36.1627, -86.7816),
+    ("New York", "NY", 40.7128, -74.0060),
+    ("Phoenix", "AZ", 33.4484, -112.0740),
+    ("Salt Lake City", "UT", 40.7608, -111.8910),
+    ("Seattle", "WA", 47.6062, -122.3321),
 ]
 
 _EQUIPMENT: list[str] = [
@@ -62,9 +63,42 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _rand_city(excluding: tuple[str, str] | None = None) -> tuple[str, str]:
-    options = [c for c in _CITIES if c != excluding]
+def _rand_city(excluding: tuple[str, str] | None = None) -> tuple[str, str, float, float]:
+    """Pick a random city tuple (city, state, lat, lon).
+
+    `excluding` may be a (city, state) pair or a full (city, state, lat, lon) tuple.
+    Comparison is done by city/state to preserve previous semantics.
+    """
+    def _matches(c: tuple[str, str, float, float]) -> bool:
+        if excluding is None:
+            return False
+        # Support callers passing either (city, state) or the full 4-tuple
+        try:
+            return (c[0], c[1]) == (excluding[0], excluding[1])
+        except Exception:
+            return False
+
+    options = [c for c in _CITIES if not _matches(c)]
     return random.choice(options)
+
+
+def _haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in miles between two lat/lon points using Haversine."""
+    R = 3958.8  # Earth radius in miles
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    lat1r = math.radians(lat1)
+    lat2r = math.radians(lat2)
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1r) * math.cos(lat2r) * math.sin(dlon / 2) ** 2
+    c = 2 * math.asin(min(1.0, math.sqrt(a)))
+    return R * c
+
+
+def _route_distance_miles(origin: tuple[str, str, float, float], dest: tuple[str, str, float, float]) -> float:
+    """Estimate route distance by applying a small routing factor to straight-line distance."""
+    base = _haversine_miles(origin[2], origin[3], dest[2], dest[3])
+    factor = random.uniform(1.07, 1.18)
+    return base * factor
 
 
 def generate_synthetic_loads(count: int) -> Dataset:
@@ -72,7 +106,7 @@ def generate_synthetic_loads(count: int) -> Dataset:
     loads: list[Load] = []
     for _ in range(count):
         origin_city = _rand_city()
-        dest_city = _rand_city(excluding=origin_city)
+        dest_city = _rand_city(excluding=(origin_city[0], origin_city[1]))
 
         pickup_start = now + timedelta(hours=random.randint(1, 72))
         pickup_end = pickup_start + timedelta(hours=random.randint(2, 10))
@@ -80,8 +114,8 @@ def generate_synthetic_loads(count: int) -> Dataset:
         delivery_start = pickup_end + timedelta(hours=transit_hours)
         delivery_end = delivery_start + timedelta(hours=random.randint(2, 10))
 
-        distance = float(random.randint(150, 2200))
-        deadhead = float(random.randint(0, 250))
+        distance = round(_route_distance_miles(origin_city, dest_city), 1)
+        deadhead = round(distance * random.uniform(0.0, 0.12), 1)
         equipment = random.choice(_EQUIPMENT)
         weight = random.randint(5000, 46000)
         hazmat = random.random() < 0.08
