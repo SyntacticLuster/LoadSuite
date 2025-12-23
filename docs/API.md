@@ -1150,6 +1150,39 @@ Get detailed confidence score breakdown for a load.
 }
 ```
 
+### Trust Endpoint (Confidence Summary)
+
+#### GET /api/loads/{load_id}/trust
+
+Returns the trust/confidence summary for a specific load with a deterministic score and a stable ordering of reasons. This is the supported contract that powers the UI trust badge; the legacy `/api/loads/{load_id}/confidence` breakdown above is a richer prototype and may diverge.
+
+**Response shape (exactly as implemented):**
+
+```json
+{
+  "load_id": "abc-123",
+  "confidence_score": 88,
+  "confidence_bucket": "high",
+  "confidence_reasons": [
+    {
+      "factor": "core_fields_present",
+      "label": "Core fields verified",
+      "contribution": 20,
+      "details": {
+        "message": "Distance, rate, and RPM present"
+      }
+    }
+  ]
+}
+```
+
+**Semantics and degradation rules:**
+- Deterministic scoring; the reason list is emitted in a stable order.
+- Degrades when RPM must be derived (`rpm_derived`), distance is clamped (`distance_clamped`), provenance timestamps are stale/expired, or provenance identifiers are missing.
+- Sensitive provenance fields (record IDs, raw source payloads) are never returned in this response; only derived factors/reasons are exposed.
+
+**Buckets:** `high` (score ≥ 80), `medium` (score ≥ 50), `low` (otherwise).
+
 ### Restricted Data Redaction
 
 Loads with `rights_state: "restricted"` have certain fields redacted:
