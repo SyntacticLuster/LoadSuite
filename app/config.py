@@ -90,7 +90,7 @@ class Settings(BaseSettings):
         default=True,
         description="Generate synthetic loads on startup"
     )
-    synthetic_load_count: int = Field(default=250, ge=0, le=10000)
+    synthetic_load_count: int = Field(default=2567, ge=0, le=10000)
 
     # /api/import safety limits
     import_max_bytes: int = Field(
