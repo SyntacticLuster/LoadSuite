@@ -204,6 +204,57 @@ class TestAlertRulesEndpoint:
         assert rule["name"] == "High RPM Alert"
         assert "id" in rule
 
+    def test_update_alert_rule_enabled(self):
+        """Verify alert rules can be updated (enabled flag)."""
+        user_id = "test-alerts-update"
+
+        create = client.post(
+            "/api/alerts",
+            params={"user_id": user_id},
+            json={
+                "name": "Toggle Me",
+                "description": "flip enabled",
+                "conditions": [{"field": "rpm", "operator": "gte", "value": 0.0}],
+                "enabled": True,
+            },
+        )
+        assert create.status_code == 200
+        rule_id = create.json()["id"]
+
+        update = client.put(
+            f"/api/alerts/{rule_id}",
+            params={"user_id": user_id},
+            json={"enabled": False},
+        )
+        assert update.status_code == 200
+        updated = update.json()
+        assert updated["enabled"] is False
+
+    def test_triggered_alerts_endpoint(self):
+        """Verify /api/alerts/triggered returns evaluations with match counts."""
+        user_id = "test-alerts-triggered"
+
+        create = client.post(
+            "/api/alerts",
+            params={"user_id": user_id},
+            json={
+                "name": "Always Matches",
+                "description": "rpm >= 0 should match synthetic loads",
+                "conditions": [{"field": "rpm", "operator": "gte", "value": 0.0}],
+                "enabled": True,
+            },
+        )
+        assert create.status_code == 200
+        rule_id = create.json()["id"]
+
+        res = client.get("/api/alerts/triggered", params={"user_id": user_id})
+        assert res.status_code == 200
+        payload = res.json()
+        assert "triggered" in payload
+        item = next((t for t in payload["triggered"] if t["rule_id"] == rule_id), None)
+        assert item is not None
+        assert item["matches_count"] >= 0
+
 
 class TestFilterPresetsEndpoint:
     """Tests for /api/presets endpoints."""

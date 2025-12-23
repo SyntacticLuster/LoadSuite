@@ -27,6 +27,7 @@ from .services.routecast_client import RouteCastClient
 from .api_models import (
     AlertRuleCreateRequest,
     AlertRuleModel,
+    AlertRuleUpdateRequest,
     AlertRulesResponse,
     CoordinateModel,
     FactorResultModel,
@@ -39,6 +40,8 @@ from .api_models import (
     RouteCastScoreResponse,
     ScoredLoadModel,
     ScoredLoadsResponse,
+    TriggeredAlertModel,
+    TriggeredAlertsResponse,
     WatchlistItemCreateRequest,
     WatchlistItemModel,
     WatchlistResponse,
@@ -864,6 +867,103 @@ def check_watchlist(
 # Alert Rules Endpoints (Stub - Execution is TODO)
 # =============================================================================
 
+def _get_alert_field_value(
+    load: Load,
+    field: str,
+    *,
+    scoring: ScoringEngine,
+    user_prefs: UserPreferences,
+    now: datetime,
+) -> Any:
+    f = (field or "").strip().lower()
+
+    if f in ("rpm",):
+        return load.rpm
+    if f in ("equipment",):
+        return load.equipment
+    if f in ("weight", "weight_lbs"):
+        return load.weight_lbs
+    if f in ("distance", "distance_miles"):
+        return load.distance_miles
+    if f in ("deadhead", "deadhead_miles"):
+        return load.deadhead_miles
+    if f in ("broker_rating", "broker.rating"):
+        return load.broker.rating
+    if f in ("commodity",):
+        return load.commodity
+    if f in ("hazmat",):
+        return load.hazmat
+    if f in ("detention",):
+        return load.detention
+    if f in ("multi_stop",):
+        return load.multi_stop
+    if f in ("lane_history",):
+        return load.lane_history
+    if f in ("origin_city",):
+        return load.origin.city
+    if f in ("origin_state",):
+        return load.origin.state
+    if f in ("destination_city",):
+        return load.destination.city
+    if f in ("destination_state",):
+        return load.destination.state
+    if f in ("lane",):
+        return f"{load.origin.city}, {load.origin.state} -> {load.destination.city}, {load.destination.state}"
+    if f in ("q", "search"):
+        return " ".join(
+            [
+                load.origin.city,
+                load.origin.state,
+                load.destination.city,
+                load.destination.state,
+                load.commodity,
+                load.broker.name,
+            ]
+        )
+    if f in ("score",):
+        return scoring.score(load, preferences=user_prefs, now=now).score
+
+    return None
+
+
+def _evaluate_alert_condition(value: Any, operator: str, target: Any) -> bool:
+    if value is None:
+        return False
+
+    op = (operator or "").strip().lower()
+
+    # Bool comparison (explicit)
+    if isinstance(value, bool) or isinstance(target, bool):
+        if op != "eq":
+            return False
+        return bool(value) is bool(target)
+
+    # Numeric comparisons (best-effort)
+    try:
+        v = float(value)
+        t = float(target)
+        if op == "gt":
+            return v > t
+        if op == "gte":
+            return v >= t
+        if op == "lt":
+            return v < t
+        if op == "lte":
+            return v <= t
+        if op == "eq":
+            return v == t
+    except (TypeError, ValueError):
+        pass
+
+    # String comparisons
+    v = str(value).strip().lower()
+    t = str(target).strip().lower()
+    if op == "eq":
+        return v == t
+    if op == "contains":
+        return t in v
+    return False
+
 @app.get("/api/alerts", response_model=AlertRulesResponse)
 def list_alert_rules(
     ctx: AppContext = Depends(get_ctx),
@@ -880,7 +980,7 @@ def create_alert_rule(
     ctx: AppContext = Depends(get_ctx),
     user_id: str = Query(default=DEFAULT_USER_ID),
 ) -> AlertRuleModel:
-    """Create a new alert rule. Note: Execution is TODO."""
+    """Create a new alert rule."""
     return ctx.alert_rules_store.create(
         user_id=user_id,
         name=req.name,
@@ -888,6 +988,28 @@ def create_alert_rule(
         conditions=req.conditions,
         enabled=req.enabled,
     )
+
+
+@app.put("/api/alerts/{rule_id}", response_model=AlertRuleModel)
+def update_alert_rule(
+    rule_id: str,
+    req: AlertRuleUpdateRequest,
+    ctx: AppContext = Depends(get_ctx),
+    user_id: str = Query(default=DEFAULT_USER_ID),
+) -> AlertRuleModel:
+    """Update an existing alert rule."""
+
+    updated = ctx.alert_rules_store.update(
+        user_id,
+        rule_id,
+        name=req.name,
+        description=req.description,
+        conditions=req.conditions,
+        enabled=req.enabled,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Alert rule not found")
+    return updated
 
 
 @app.delete("/api/alerts/{rule_id}")
@@ -901,6 +1023,77 @@ def delete_alert_rule(
     if not deleted:
         raise HTTPException(status_code=404, detail="Alert rule not found")
     return {"ok": True, "deleted": True}
+
+
+@app.get("/api/alerts/triggered", response_model=TriggeredAlertsResponse)
+def list_triggered_alerts(
+    ctx: AppContext = Depends(get_ctx),
+    scoring: ScoringEngine = Depends(get_scoring),
+    user_id: str = Query(default=DEFAULT_USER_ID),
+    matching_load_limit: int = Query(default=5, ge=0, le=50),
+) -> TriggeredAlertsResponse:
+    """Evaluate enabled alert rules against the current active loads."""
+
+    now = datetime.now(timezone.utc)
+    rules = ctx.alert_rules_store.list(user_id)
+    loads = _active_loads(ctx)
+
+    prefs_model, _ = ctx.preferences_store.get(user_id)
+    user_prefs = _convert_prefs_to_user_prefs(prefs_model)
+
+    triggered: List[TriggeredAlertModel] = []
+    for rule in rules:
+        if not rule.enabled or not rule.conditions:
+            triggered.append(
+                TriggeredAlertModel(
+                    rule_id=rule.id,
+                    name=rule.name,
+                    description=rule.description,
+                    enabled=rule.enabled,
+                    matches_count=0,
+                    matching_load_ids=[],
+                    evaluated_at=now,
+                    last_triggered=rule.last_triggered,
+                )
+            )
+            continue
+
+        matched_ids: List[str] = []
+        for load in loads:
+            ok = True
+            for cond in rule.conditions:
+                val = _get_alert_field_value(
+                    load,
+                    cond.field,
+                    scoring=scoring,
+                    user_prefs=user_prefs,
+                    now=now,
+                )
+                if not _evaluate_alert_condition(val, cond.operator, cond.value):
+                    ok = False
+                    break
+            if ok:
+                matched_ids.append(load.id)
+
+        if matched_ids:
+            ctx.alert_rules_store.mark_triggered(user_id, rule.id, now=now)
+
+        triggered.append(
+            TriggeredAlertModel(
+                rule_id=rule.id,
+                name=rule.name,
+                description=rule.description,
+                enabled=rule.enabled,
+                matches_count=len(matched_ids),
+                matching_load_ids=matched_ids[:matching_load_limit] if matching_load_limit else [],
+                evaluated_at=now,
+                last_triggered=ctx.alert_rules_store.get(user_id, rule.id).last_triggered
+                if ctx.alert_rules_store.get(user_id, rule.id)
+                else rule.last_triggered,
+            )
+        )
+
+    return TriggeredAlertsResponse(user_id=user_id, triggered=triggered, evaluated_at=now)
 
 
 # =============================================================================

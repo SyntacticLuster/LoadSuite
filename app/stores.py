@@ -12,7 +12,7 @@ For production, replace with database-backed implementations.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from uuid import uuid4
 
@@ -178,6 +178,69 @@ class AlertRulesStore:
                 )
                 return True
         return False
+
+    def update(
+        self,
+        user_id: str,
+        rule_id: str,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        conditions: Optional[list] = None,
+        enabled: Optional[bool] = None,
+    ) -> Optional[AlertRuleModel]:
+        """Update fields on an alert rule."""
+
+        for i, rule in enumerate(self._data.get(user_id, [])):
+            if rule.id != rule_id:
+                continue
+
+            updated = AlertRuleModel(
+                id=rule.id,
+                user_id=rule.user_id,
+                name=rule.name if name is None else name,
+                description=rule.description if description is None else description,
+                conditions=rule.conditions if conditions is None else conditions,
+                enabled=rule.enabled if enabled is None else enabled,
+                created_at=rule.created_at,
+                last_triggered=rule.last_triggered,
+            )
+            self._data[user_id][i] = updated
+            return updated
+
+        return None
+
+    def mark_triggered(
+        self,
+        user_id: str,
+        rule_id: str,
+        *,
+        now: datetime,
+        min_interval: timedelta = timedelta(minutes=5),
+    ) -> Optional[AlertRuleModel]:
+        """Update last_triggered for a rule, throttled to avoid spam."""
+
+        for i, rule in enumerate(self._data.get(user_id, [])):
+            if rule.id != rule_id:
+                continue
+
+            if rule.last_triggered is not None and (now - rule.last_triggered) < min_interval:
+                return rule
+
+            updated = AlertRuleModel(
+                id=rule.id,
+                user_id=rule.user_id,
+                name=rule.name,
+                description=rule.description,
+                conditions=rule.conditions,
+                enabled=rule.enabled,
+                created_at=rule.created_at,
+                last_triggered=now,
+            )
+            self._data[user_id][i] = updated
+            return updated
+
+        return None
 
 
 class FilterPresetsStore:

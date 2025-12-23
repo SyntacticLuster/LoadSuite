@@ -241,11 +241,41 @@ class AlertRuleCreateRequest(BaseModel):
     enabled: bool = True
 
 
+class AlertRuleUpdateRequest(BaseModel):
+    """Request to update an alert rule."""
+
+    name: Optional[str] = None
+    description: Optional[str] = None
+    conditions: Optional[List[AlertCondition]] = None
+    enabled: Optional[bool] = None
+
+
 class AlertRulesResponse(BaseModel):
     """Response for alert rules listing."""
     user_id: str
     rules: List[AlertRuleModel]
     total: int
+
+
+class TriggeredAlertModel(BaseModel):
+    """Evaluation result for an alert rule."""
+
+    rule_id: str
+    name: str
+    description: Optional[str] = None
+    enabled: bool
+    matches_count: int
+    matching_load_ids: List[str] = Field(default_factory=list)
+    evaluated_at: datetime
+    last_triggered: Optional[datetime] = None
+
+
+class TriggeredAlertsResponse(BaseModel):
+    """Response for triggered alerts."""
+
+    user_id: str
+    triggered: List[TriggeredAlertModel]
+    evaluated_at: datetime
 
 
 # =============================================================================

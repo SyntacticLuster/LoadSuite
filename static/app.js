@@ -389,6 +389,8 @@ const state = {
     fetchedAtForecastMs: 0,
     fetchedAtAlertsMs: 0,
   },
+  alertRules: [],
+  triggeredAlerts: [],
 };
 
 const WEATHER_FORECAST_TTL_MS = 10 * 60 * 1000;
@@ -960,6 +962,104 @@ const fetchFilterPresets = async () => {
     console.error("Failed to fetch presets:", err);
   }
 };
+const fetchAlertRules = async () => {
+  try {
+    const res = await apiGet("/api/alerts");
+    state.alertRules = res.rules || [];
+  } catch (err) {
+    console.error("Failed to fetch alert rules:", err);
+    state.alertRules = [];
+  }
+};
+
+const fetchTriggeredAlerts = async () => {
+  try {
+    const res = await apiGet("/api/alerts/triggered");
+    state.triggeredAlerts = res.triggered || [];
+  } catch (err) {
+    console.error("Failed to fetch triggered alerts:", err);
+    state.triggeredAlerts = [];
+  }
+};
+
+const refreshAlerts = async () => {
+  await fetchAlertRules();
+  await fetchTriggeredAlerts();
+};
+
+const buildAlertConditionsFromFilters = () => {
+  const conds = [];
+  const q = state.query || {};
+
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const boolFromStr = (v) => (v === "true" ? true : v === "false" ? false : null);
+
+  if (String(q.q || "").trim()) conds.push({ field: "q", operator: "contains", value: String(q.q).trim() });
+  if (String(q.equipment || "").trim()) conds.push({ field: "equipment", operator: "eq", value: String(q.equipment).trim() });
+
+  const rpmMin = num(q.rpm_min);
+  if (rpmMin !== null) conds.push({ field: "rpm", operator: "gte", value: rpmMin });
+
+  const weightMin = num(q.weight_min);
+  if (weightMin !== null) conds.push({ field: "weight_lbs", operator: "gte", value: weightMin });
+
+  const weightMax = num(q.weight_max);
+  if (weightMax !== null) conds.push({ field: "weight_lbs", operator: "lte", value: weightMax });
+
+  const deadheadMax = num(q.deadhead_max);
+  if (deadheadMax !== null) conds.push({ field: "deadhead_miles", operator: "lte", value: deadheadMax });
+
+  const brokerMin = num(q.broker_rating_min);
+  if (brokerMin !== null) conds.push({ field: "broker_rating", operator: "gte", value: brokerMin });
+
+  const hazmat = boolFromStr(q.hazmat);
+  if (hazmat !== null) conds.push({ field: "hazmat", operator: "eq", value: hazmat });
+
+  const detention = boolFromStr(q.detention);
+  if (detention !== null) conds.push({ field: "detention", operator: "eq", value: detention });
+
+  const multiStop = boolFromStr(q.multi_stop);
+  if (multiStop !== null) conds.push({ field: "multi_stop", operator: "eq", value: multiStop });
+
+  const laneHistory = boolFromStr(q.lane_history);
+  if (laneHistory !== null) conds.push({ field: "lane_history", operator: "eq", value: laneHistory });
+
+  return conds;
+};
+
+const createAlertFromFilters = async (name) => {
+  try {
+    const conditions = buildAlertConditionsFromFilters();
+    await apiPostJson("/api/alerts", { name, description: "From current filters", conditions, enabled: true });
+    await refreshAlerts();
+    render();
+  } catch (err) {
+    console.error("Failed to create alert:", err);
+  }
+};
+
+const setAlertEnabled = async (ruleId, enabled) => {
+  try {
+    await apiPut(`/api/alerts/${ruleId}`, { enabled: !!enabled });
+    await refreshAlerts();
+    render();
+  } catch (err) {
+    console.error("Failed to update alert:", err);
+  }
+};
+
+const deleteAlertRule = async (ruleId) => {
+  try {
+    await apiDelete(`/api/alerts/${ruleId}`);
+    await refreshAlerts();
+    render();
+  } catch (err) {
+    console.error("Failed to delete alert:", err);
+  }
+};
 
 const saveFilterPreset = async (name) => {
   try {
@@ -1251,8 +1351,11 @@ const renderList = async (root) => {
     {
       class:
         "flex-1 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
-      onclick: () => {
+      onclick: async () => {
         state.terminalPanelOpen = !state.terminalPanelOpen;
+        if (state.terminalPanelOpen) {
+          await Promise.all([fetchWatchlist(), fetchFilterPresets(), refreshAlerts()]);
+        }
         render();
       },
     },
@@ -1795,20 +1898,103 @@ const renderTerminalPanel = () => {
   alertsSection.appendChild(
     el("div", { class: "text-sm font-semibold text-emerald-700 dark:text-emerald-400" }, ["🔔 Alerts"])
   );
+
+  let alertNameInput;
   alertsSection.appendChild(
-    el("div", { class: "text-xs text-slate-600 dark:text-slate-400" }, [
-      "Alert rules coming soon. Create rules to get notified when loads match your criteria.",
+    el("div", { class: "flex gap-2" }, [
+      (alertNameInput = el("input", {
+        class:
+          "flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900",
+        placeholder: "Alert name (uses current filters)…",
+      })),
+      el(
+        "button",
+        {
+          class:
+            "shrink-0 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+          onclick: async () => {
+            const name = alertNameInput.value.trim();
+            if (!name) return;
+            await createAlertFromFilters(name);
+            alertNameInput.value = "";
+          },
+        },
+        ["Create"]
+      ),
+      el(
+        "button",
+        {
+          class:
+            "shrink-0 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+          title: "Re-evaluate alerts",
+          onclick: async () => {
+            await refreshAlerts();
+            render();
+          },
+        },
+        ["Refresh"]
+      ),
     ])
   );
-  const alertPlaceholder = el(
-    "div",
-    { class: "rounded border border-dashed border-slate-400 p-3 text-center text-xs text-slate-500 dark:border-slate-600" },
-    [
-      el("div", {}, ["No alert rules configured"]),
-      el("div", { class: "pt-1 text-[0.65rem]" }, ["(Alert execution is TODO)"]),
-    ]
-  );
-  alertsSection.appendChild(alertPlaceholder);
+
+  const byRuleId = {};
+  for (const t of state.triggeredAlerts || []) byRuleId[t.rule_id] = t;
+
+  if (!state.alertRules || state.alertRules.length === 0) {
+    alertsSection.appendChild(
+      el(
+        "div",
+        { class: "rounded border border-dashed border-slate-400 p-3 text-center text-xs text-slate-500 dark:border-slate-600" },
+        [el("div", {}, ["No alert rules configured"])]
+      )
+    );
+  } else {
+    const list = el("div", { class: "space-y-2" });
+    for (const rule of state.alertRules) {
+      const trig = byRuleId[rule.id] || { matches_count: 0, last_triggered: null };
+      const last = trig.last_triggered ? new Date(trig.last_triggered).toLocaleString() : "—";
+
+      list.appendChild(
+        el(
+          "div",
+          { class: "rounded border border-slate-200 bg-white p-2 text-xs dark:border-slate-800 dark:bg-slate-900" },
+          [
+            el("div", { class: "flex items-center justify-between gap-2" }, [
+              el("div", { class: "min-w-0" }, [
+                el("div", { class: "truncate font-semibold text-slate-800 dark:text-slate-200" }, [rule.name]),
+                rule.description
+                  ? el("div", { class: "truncate text-slate-600 dark:text-slate-400" }, [rule.description])
+                  : null,
+              ].filter(Boolean)),
+              el("div", { class: "flex items-center gap-2" }, [
+                el("div", { class: "text-slate-600 dark:text-slate-400" }, [`${trig.matches_count} match${trig.matches_count === 1 ? "" : "es"}`]),
+                el("label", { class: "flex items-center gap-1 text-slate-700 dark:text-slate-300" }, [
+                  el("input", {
+                    type: "checkbox",
+                    checked: rule.enabled ? "checked" : undefined,
+                    onchange: (e) => setAlertEnabled(rule.id, e.target.checked),
+                  }),
+                  "On",
+                ]),
+                el(
+                  "button",
+                  {
+                    class: "text-red-500 hover:text-red-700",
+                    title: "Delete alert",
+                    onclick: () => deleteAlertRule(rule.id),
+                  },
+                  ["×"]
+                ),
+              ]),
+            ]),
+            el("div", { class: "pt-1 text-[0.7rem] text-slate-600 dark:text-slate-400" }, [`Last triggered: ${last}`]),
+          ].filter(Boolean)
+        )
+      );
+    }
+    alertsSection.appendChild(list);
+  }
+
   wrap.appendChild(alertsSection);
 
   return wrap;
