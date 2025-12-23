@@ -1180,7 +1180,7 @@ const renderList = async (root) => {
     "button",
     {
       class:
-        "w-full rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+        "flex-1 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
       onclick: () => {
         state.filtersOpen = !state.filtersOpen;
         render();
@@ -1191,9 +1191,22 @@ const renderList = async (root) => {
     ]
   );
 
+  const terminalBtn = el(
+    "button",
+    {
+      class:
+        "flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+      onclick: () => {
+        state.terminalPanelOpen = !state.terminalPanelOpen;
+        render();
+      },
+    },
+    [state.terminalPanelOpen ? "Hide Terminal Workflows" : "Terminal Workflows"]
+  );
+
   top.appendChild(searchRow);
 
-  top.appendChild(filtersBtn);
+  top.appendChild(el("div", { class: "flex flex-col gap-2 sm:flex-row" }, [filtersBtn, terminalBtn]));
 
   if (state.filtersOpen) {
     const panels = el(
@@ -1206,7 +1219,9 @@ const renderList = async (root) => {
     top.appendChild(panels);
   }
 
-  // Terminal workflows panel intentionally hidden from the main header now.
+  if (state.terminalPanelOpen) {
+    top.appendChild(renderTerminalPanel());
+  }
 
   const sortSelect = (() => {
     const s = el(
