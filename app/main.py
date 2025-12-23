@@ -11,7 +11,7 @@ from typing import Any, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .app_context import AppContext
@@ -23,6 +23,7 @@ from .filters import apply_filters, apply_sort
 from .ingestion.manager import IngestionManager
 from .models import Load, LoadsQuery, RefreshRequest
 from .news import get_news_items
+from .metrics import get_metrics_text
 from .services.routecast_client import RouteCastClient
 from .api_models import (
     AlertRuleCreateRequest,
@@ -249,6 +250,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# -----------------------------------------------------------------------------
+# Metrics middleware: collect HTTP request metrics with low-cardinality labels
+# -----------------------------------------------------------------------------
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    import time
+
+    from .metrics import http_request_duration_seconds, http_requests_total
+
+    start = time.perf_counter()
+    status_code = 500
+
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        route_template = getattr(request.scope.get("route"), "path", None) or "unknown_route"
+        try:
+            http_requests_total.labels(request.method, route_template, str(status_code)).inc()
+            http_request_duration_seconds.labels(request.method, route_template).observe(
+                time.perf_counter() - start
+            )
+        except Exception:
+            logger.debug("metrics emit skipped", exc_info=True)
+
 # Default app context for request handlers.
 # (Starlette TestClient does not run lifespan unless used as a context manager.)
 app.state.ctx = _build_default_ctx()
@@ -267,6 +295,12 @@ def _active_loads(ctx: AppContext) -> list[Load]:
     if settings.ingestion_enabled and ctx.ingestion_manager is not None:
         return ctx.ingestion_manager.get_loads()
     return ctx.dataset.loads
+
+
+@app.get("/metrics")
+def metrics_endpoint() -> Response:
+    payload, content_type = get_metrics_text()
+    return Response(content=payload, media_type=content_type)
 
 
 @app.get("/api/health")

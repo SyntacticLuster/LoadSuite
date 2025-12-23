@@ -14,6 +14,7 @@ asyncpg = "^0.30.0"
 pydantic-settings = "^2.7.0"
 python-dotenv = "^1.0.1"
 a2wsgi = "^1.10.10"
+prometheus_client = "^0.21.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"
