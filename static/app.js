@@ -699,6 +699,10 @@ const fetchRouteCast = async (loadId) => {
 const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) => {
   const id = String(loadId || "").trim();
   const isCollapsed = !!state.ui.collapseRouteCast;
+  const rc = state.routecast.loadId === id ? state.routecast.data : null;
+  const routeAlertCount =
+    rc?.route_alerts?.count ?? rc?.route_alerts?.alerts?.length ?? 0;
+  const hasRouteAlerts = routeAlertCount > 0;
 
   const jumpToLoadDetail = () => {
     if (!id) return;
@@ -708,6 +712,21 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
     window.location.hash = `#/load/${encodeURIComponent(id)}`;
   };
 
+  const logoBlockChildren = [
+    el("img", {
+      src: toAppUrl("/static/images/rc_logo.png"),
+      alt: "RouteCast",
+      class: "h-14 w-auto object-contain",
+    }),
+    isCollapsed && hasRouteAlerts
+      ? el(
+          "div",
+          { class: "pt-1 text-[0.65rem] font-semibold text-red-600 dark:text-red-400" },
+          ["Alerts exist on route"]
+        )
+      : null,
+  ];
+
   const titleRow = el(
     "div",
     { class: "flex items-center justify-between gap-2" },
@@ -715,19 +734,13 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
       el(
         "div",
         {
-          class: `text-sm font-semibold text-slate-800 dark:text-slate-200${id ? " cursor-pointer" : ""}`,
+          class: `flex flex-col items-start gap-1${id ? " cursor-pointer" : ""}`,
           title: id ? "Open load detail" : "RouteCast",
           onclick: () => {
             if (id) jumpToLoadDetail();
           },
         },
-        [
-          el("img", {
-            src: toAppUrl("/static/images/rc_logo.png"),
-            alt: "RouteCast",
-            class: "h-14 w-auto object-contain",
-          }),
-        ]
+        logoBlockChildren
       ),
       el(
         "button",
@@ -799,7 +812,6 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
     return wrap;
   }
 
-  const rc = state.routecast.data;
   if (!rc) {
     wrap.appendChild(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["RouteCast not available."]));
     return wrap;
