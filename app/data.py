@@ -252,16 +252,24 @@ def detect_and_parse_import(filename: str, content: bytes) -> tuple[list[Load], 
         return loads_from_csv_bytes(content), "csv"
 
 
-def write_sample_files(base_dir: Path) -> None:
+def write_sample_files(base_dir: Path, *, overwrite: bool = False) -> None:
     sample_dir = base_dir / "sample_data"
     sample_dir.mkdir(parents=True, exist_ok=True)
+
+    json_path = sample_dir / "sample_loads.json"
+    csv_path = sample_dir / "sample_loads.csv"
+
+    # These files are committed in-repo as static examples. Regenerating them on
+    # every server start causes noisy diffs and accidental deploy commits.
+    if not overwrite and json_path.exists() and csv_path.exists():
+        return
+
     dataset = generate_synthetic_loads(25)
-    (sample_dir / "sample_loads.json").write_text(
+    json_path.write_text(
         json.dumps([l.model_dump(mode="json") for l in dataset.loads], indent=2),
         encoding="utf-8",
     )
 
-    csv_path = sample_dir / "sample_loads.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(
