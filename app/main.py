@@ -961,19 +961,19 @@ def _static_file(path: str) -> FileResponse:
 # Favicons / PWA assets at domain root (browsers often request these from '/').
 @app.get("/favicon.ico")
 def favicon() -> FileResponse:
-    # Default to the round transparent favicon.
+    # Default to the mixed-UI round favicon (navy fill) to stay visible on light tabs.
     return _static_file("favicon.ico")
 
 
 @app.get("/favicon-bg.ico")
 def favicon_bg() -> FileResponse:
-    # Keep route for backwards-compat, but serve the round transparent favicon.
+    # Keep route for backwards-compat.
     return _static_file("favicon.ico")
 
 
 @app.get("/favicon-transparent.ico")
 def favicon_transparent() -> FileResponse:
-    return _static_file("favicon.ico")
+    return _static_file("favicon-round-transparent.ico")
 
 
 @app.get("/favicon-16x16.png")

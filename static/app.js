@@ -696,16 +696,31 @@ const fetchRouteCast = async (loadId) => {
   }
 };
 
-const renderRouteCastWidget = (loadId, { compact } = { compact: false }) => {
+const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) => {
   const id = String(loadId || "").trim();
   const isCollapsed = !!state.ui.collapseRouteCast;
+
+  const jumpToLoadDetail = () => {
+    if (!id) return;
+    const route = getHashRoute();
+    if (route.page === "load" && String(route.id || "") === id) return;
+    setLastSelectedLoadId(id);
+    window.location.hash = `#/load/${encodeURIComponent(id)}`;
+  };
+
   const titleRow = el(
     "div",
     { class: "flex items-center justify-between gap-2" },
     [
       el(
         "div",
-        { class: "text-sm font-semibold text-slate-800 dark:text-slate-200" },
+        {
+          class: `text-sm font-semibold text-slate-800 dark:text-slate-200${id ? " cursor-pointer" : ""}`,
+          title: id ? "Open load detail" : "RouteCast",
+          onclick: () => {
+            if (id) jumpToLoadDetail();
+          },
+        },
         [
           el("img", {
             src: toAppUrl("/static/images/rc_logo.png"),
@@ -741,6 +756,25 @@ const renderRouteCastWidget = (loadId, { compact } = { compact: false }) => {
   );
 
   if (isCollapsed) return wrap;
+
+  const summaryLoad = load || state.latestLoads.find((l) => String(l?.id || "") === id) || null;
+  if (id && summaryLoad) {
+    const lane = `${summaryLoad.origin.city}, ${summaryLoad.origin.state} → ${summaryLoad.destination.city}, ${summaryLoad.destination.state}`;
+    const rpm = summaryLoad.rpm !== null && summaryLoad.rpm !== undefined ? `$${fmtNum(summaryLoad.rpm, 2)}/mi` : "";
+    const distance = summaryLoad.distance_miles !== null && summaryLoad.distance_miles !== undefined ? `${fmtNum(summaryLoad.distance_miles)} mi` : "";
+    const deadhead = summaryLoad.deadhead_miles !== null && summaryLoad.deadhead_miles !== undefined ? `${fmtNum(summaryLoad.deadhead_miles)} dh` : "";
+    const equipment = summaryLoad.equipment ? String(summaryLoad.equipment) : "";
+    const metrics = [rpm, distance, deadhead, equipment].filter(Boolean).join(" • ");
+
+    wrap.appendChild(
+      el("div", { class: "pt-2" }, [
+        el("div", { class: "text-xs font-semibold text-slate-800 dark:text-slate-200" }, [lane]),
+        metrics
+          ? el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, [metrics])
+          : null,
+      ].filter(Boolean))
+    );
+  }
 
   if (!id) {
     wrap.appendChild(
@@ -1921,7 +1955,7 @@ const renderDetail = async (root, id) => {
           }`,
           title: buildScoreTooltip(scoreData.score, greenlightOk, load),
         },
-        [`Score: ${scoreData.score.toFixed(1)}`]
+        [`${scoreData.score.toFixed(1)}`]
       )
     : null;
 
@@ -2029,7 +2063,7 @@ const renderDetail = async (root, id) => {
   ]);
 
   const rightCol = el("div", { class: "pt-3 lg:pt-0 lg:w-[28rem] lg:flex-shrink-0" }, [
-    renderRouteCastWidget(id, { compact: false }),
+    renderRouteCastWidget(id, { compact: false, load }),
   ]);
 
   const card = el("div", { class: "mt-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" }, [
