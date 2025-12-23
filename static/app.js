@@ -578,9 +578,9 @@ const renderWeatherSidebar = () => {
     if (current) {
       const emoji = weatherEmojiForText(current.shortForecast, { isDay: current.isDaytime === false ? false : true });
       forecastAlways.push(
-        el("div", { class: "pt-3" }, [
-          el("div", { class: "text-xs font-semibold text-slate-600 dark:text-slate-400" }, ["Current Conditions"]),
-          el("div", { class: "pt-1 flex items-baseline justify-end gap-2 text-xs" }, [
+        el("div", { class: "pt-2" }, [
+          el("div", { class: "flex items-baseline justify-between gap-2 text-xs" }, [
+            el("div", { class: "font-semibold text-slate-600 dark:text-slate-400" }, ["Current Conditions"]),
             el("div", { class: "text-slate-700 dark:text-slate-300" }, [
               renderTempLabel(current.temperature, current.temperatureUnit, { isDay: !!current.isDaytime }),
             ]),
@@ -1105,10 +1105,7 @@ const renderScoreLegend = () => {
     el("span", { class: "text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wide" }, ["Legend:"]),
     pill("GreenLight", greenlightLegendCls),
     pill("Scored", "bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100"),
-    pill(
-      "Warnings/Fails",
-      "border border-amber-300 bg-gradient-to-r from-yellow-200 via-amber-200 to-red-200 text-red-900"
-    ),
+    pill("Warning", "border border-amber-300 bg-gradient-to-r from-yellow-200 via-amber-200 to-red-200 text-red-900"),
   ]);
 };
 
