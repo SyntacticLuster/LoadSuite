@@ -221,9 +221,20 @@ from app.data import generate_synthetic_loads, Dataset
 def client():
     """Provide a test client with fresh synthetic data."""
     # Reset to known state
-    from app import main
-    main._dataset = generate_synthetic_loads(100)
+    app.state.ctx.dataset = generate_synthetic_loads(100)
     return TestClient(app)
+
+# Alternative (cleaner): override the context dependency instead of mutating global app state.
+#
+# from app.deps import get_ctx
+# from app.app_context import AppContext
+#
+# @pytest.fixture
+# def client():
+#     ctx = AppContext(...)
+#     app.dependency_overrides[get_ctx] = lambda: ctx
+#     yield TestClient(app)
+#     app.dependency_overrides.clear()
 
 @pytest.fixture
 def client_with_loads(client):

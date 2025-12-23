@@ -228,11 +228,3 @@ class FilterPresetsStore:
         return False
 
 
-# =============================================================================
-# Global Store Instances (Singleton pattern for simple use)
-# =============================================================================
-
-preferences_store = PreferencesStore()
-watchlist_store = WatchlistStore()
-alert_rules_store = AlertRulesStore()
-filter_presets_store = FilterPresetsStore()

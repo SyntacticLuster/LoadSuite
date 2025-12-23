@@ -6,7 +6,7 @@ Loads configuration from environment variables and .env file.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from pydantic import Field, PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     # Application
     environment: Literal["development", "staging", "production"] = "development"
     secret_key: str = Field(default="dev-secret-change-in-production")
+    auth_enabled: bool = Field(
+        default=False,
+        description="Enable minimal API-key auth for sensitive endpoints",
+    )
+    admin_api_key: str = Field(
+        default="",
+        description="Admin API key used when AUTH_ENABLED=true (sent via Bearer or X-API-Key)",
+    )
     cors_origins: str = Field(
         default="http://localhost:8000,http://localhost:3000",
         description="Comma-separated list of allowed CORS origins"
@@ -43,11 +51,106 @@ class Settings(BaseSettings):
         default=False,
         description="Use PostgreSQL for persistence (False = in-memory)"
     )
+
+    # Ingestion (MVP backbone; in-memory by default)
+    ingestion_enabled: bool = Field(
+        default=False,
+        description="Enable ingestion framework (connectors/normalization/dedupe/provenance)"
+    )
+    ingestion_connectors: str = Field(
+        default="",
+        description=(
+            "Comma-separated connector specs. MVP format is intentionally loose; "
+            "examples: 'json:/path/to/file.json,csv:/path/to/file.csv'"
+        ),
+    )
+    ingestion_quarantine_mode: bool = Field(
+        default=True,
+        description="Default-deny rights posture: unknown sources are quarantined with TTL"
+    )
+    ingestion_default_ttl_seconds: int = Field(
+        default=86400,
+        ge=60,
+        description="Default TTL for quarantined records (seconds)"
+    )
+    raw_payload_ttl_seconds: int = Field(
+        default=86400,
+        ge=60,
+        description="Default TTL for raw payload blobs stored by RawPayloadStore (seconds)"
+    )
+    ingestion_poll_interval_seconds: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Background ingestion poll interval (seconds). 0 disables background polling. "
+            "Only applies when ingestion_enabled=true."
+        ),
+    )
     generate_synthetic_loads: bool = Field(
         default=True,
         description="Generate synthetic loads on startup"
     )
     synthetic_load_count: int = Field(default=250, ge=0, le=10000)
+
+    # /api/import safety limits
+    import_max_bytes: int = Field(
+        default=2_000_000,
+        ge=1,
+        le=50_000_000,
+        description="Maximum request body size (bytes) accepted by /api/import",
+    )
+    import_max_records: int = Field(
+        default=5000,
+        ge=1,
+        le=100_000,
+        description="Maximum number of load records accepted by /api/import",
+    )
+
+    import_max_csv_line_length: int = Field(
+        default=100_000,
+        ge=100,
+        le=5_000_000,
+        description="Maximum CSV line length accepted by /api/import (guards against absurd rows)",
+    )
+    import_max_csv_field_length: int = Field(
+        default=20_000,
+        ge=100,
+        le=5_000_000,
+        description="Maximum CSV field length accepted by /api/import (guards against huge cells)",
+    )
+
+    # RouteCast (server-to-server; disabled by default)
+    routecast_enabled: bool = Field(
+        default=False,
+        description="Enable RouteCast integration (env: ROUTECAST_ENABLED)",
+    )
+    routecast_base_url: str = Field(
+        default="http://localhost:8050",
+        description="RouteCast base URL (env: ROUTECAST_BASE_URL)",
+    )
+    routecast_timeout_seconds: float = Field(
+        default=0.75,
+        ge=0.1,
+        description="HTTP timeout for RouteCast requests in seconds (env: ROUTECAST_TIMEOUT_SECONDS)",
+    )
+    routecast_cache_ttl_seconds: int = Field(
+        default=900,
+        ge=60,
+        description="Positive-cache TTL for RouteCast responses in seconds (env: ROUTECAST_CACHE_TTL_SECONDS)",
+    )
+    routecast_negative_cache_ttl_seconds: int = Field(
+        default=60,
+        ge=1,
+        description="Negative-cache TTL for RouteCast failures in seconds (env: ROUTECAST_NEGATIVE_CACHE_TTL_SECONDS)",
+    )
+    routecast_provider: str = Field(
+        default="osrm",
+        description="RouteCast provider name to echo in responses (env: ROUTECAST_PROVIDER)",
+    )
+    routecast_api_key: Optional[str] = Field(
+        default=None,
+        description="RouteCast API key for Authorization header (env: ROUTECAST_API_KEY)",
+    )
     
     @property
     def cors_origins_list(self) -> List[str]:
@@ -71,3 +174,7 @@ def get_settings() -> Settings:
 
 # Convenience export
 settings = get_settings()
+
+# Backwards/ops-friendly constants (also map to env vars IMPORT_MAX_BYTES / IMPORT_MAX_RECORDS)
+IMPORT_MAX_BYTES = settings.import_max_bytes
+IMPORT_MAX_RECORDS = settings.import_max_records

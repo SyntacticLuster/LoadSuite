@@ -9,7 +9,54 @@
 
 ## Overview
 
+### API Import Limits
+
+The `/api/import` endpoint is intentionally capped for safety:
+
+- Max request size: `IMPORT_MAX_BYTES` (returns **413** if exceeded)
+- Max records per import: `IMPORT_MAX_RECORDS` (returns **400** if exceeded)
+
+Supported formats:
+- JSON: **array of objects** (validated into the canonical `Load` model)
+- CSV: validated rows with required columns; same record cap applies
+
+CSV guardrail: the API rejects absurdly long CSV lines/fields (to avoid “one giant cell of base64 sadness”).
+
+Both are configurable via environment variables and default to conservative values.
+
+Operational note: by default, ingestion state and related “stores” are **in-memory and per-process**. In multi-worker deployments (e.g., Gunicorn/Uvicorn with `--workers`), each worker maintains its own ingestion cursor/store/data and they will diverge unless you use DB-backed persistence or an external shared store (e.g., Redis).
+
 FreightLens's ingestion layer transforms raw external data into normalized, deduplicated records with full provenance tracking. The system is designed to be **vendor-agnostic**, supporting multiple data sources through a pluggable connector architecture.
+
+### Local Dev: Simulate Live Loads (Directory Tail)
+
+Use the `json_dir_tail` connector to simulate a live load feed locally by dropping new `*.json` files into a folder. On each fetch, it only reads files **newer than the last cursor** (cursor is `mtime_ns + filename`).
+
+- Set env vars:
+    - `INGESTION_ENABLED=true`
+    - `INGESTION_CONNECTORS="json_dir_tail:/absolute/path/to/dropfolder"`
+- Trigger ingestion:
+    - Manual: `POST /api/ingestion/run`
+    - Or set `INGESTION_POLL_INTERVAL_SECONDS` to a non-zero value and rely on the poller.
+
+Optional cursor persistence: set `INGESTION_CURSOR_STORE_PATH=/path/to/cursors.json` to persist the per-connector cursor (keyed by connector id/name) across process restarts. If unset, behavior remains in-memory only.
+
+If API-key auth is enabled (`AUTH_ENABLED=true`), include either `Authorization: Bearer <ADMIN_API_KEY>` or `X-API-Key: <ADMIN_API_KEY>` for `POST /api/ingestion/run` and `GET /api/ingestion/sources`.
+
+Notes:
+- Each JSON file can be a single object or an array of objects.
+- Files with invalid JSON are skipped and reported in connector errors.
+
+### Current Connector Specs (MVP)
+
+Connector specs are a **comma-separated** list in `INGESTION_CONNECTORS`.
+
+Supported formats:
+- `json:/absolute/or/relative/path.json`
+- `csv:/absolute/or/relative/path.csv`
+- `json_dir_tail:/absolute/path/to/dropfolder`
+- `dat_stub` (optional params: `dat_stub:api_key=...&client_id=...&client_secret=...`)
+- `truckstop_stub` (optional params: `truckstop_stub:api_key=...&username=...&password=...`)
 
 ### Design Goals
 

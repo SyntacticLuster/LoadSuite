@@ -15,9 +15,12 @@ pydantic-settings = "^2.7.0"
 python-dotenv = "^1.0.1"
 a2wsgi = "^1.10.10"
 
-[tool.poetry.dev-dependencies]
-# pytest can be used for future verification scripts when needed.
+[tool.poetry.group.dev.dependencies]
 pytest = "^8.3"
+routecast-core = { path = "packages/routecast-core", develop = true }
+routecast-sources = { path = "packages/routecast-sources", develop = true }
+routecast-routing = { path = "packages/routecast-routing", develop = true }
+routecast-api = { path = "apps/routecast-api", develop = true }
 
 [[tool.poetry.packages]]
 include = "app"

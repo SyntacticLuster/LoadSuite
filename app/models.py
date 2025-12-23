@@ -44,7 +44,7 @@ class Load(BaseModel):
     updated_at: datetime
 
 
-SortKey = Literal["composite", "rpm_desc", "pickup_soonest", "deadhead_asc", "broker_desc"]
+SortKey = Literal["composite", "rpm_desc", "pickup_soonest", "deadhead_asc", "broker_desc", "score_desc"]
 
 
 class RefreshRequest(BaseModel):

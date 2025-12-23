@@ -153,12 +153,60 @@ def loads_from_json_bytes(data: bytes) -> list[Load]:
     return [Load.model_validate(item) for item in raw]
 
 
-def loads_from_csv_bytes(data: bytes) -> list[Load]:
+def loads_from_csv_bytes(
+    data: bytes,
+    *,
+    max_records: int | None = None,
+    max_line_length: int | None = None,
+    max_field_length: int | None = None,
+) -> list[Load]:
     text = data.decode("utf-8")
-    reader = csv.DictReader(text.splitlines())
+    lines = text.splitlines()
+
+    if max_line_length is not None:
+        limit = int(max_line_length)
+        for i, line in enumerate(lines):
+            if len(line) > limit:
+                raise ValueError(f"CSV line {i + 1} too long")
+
+    reader = csv.DictReader(lines)
+    required_columns = {
+        "origin_city",
+        "origin_state",
+        "destination_city",
+        "destination_state",
+        "pickup_start",
+        "pickup_end",
+        "delivery_start",
+        "delivery_end",
+        "equipment",
+        "weight_lbs",
+        "distance_miles",
+        "deadhead_miles",
+        "rate_total_usd",
+        "rpm",
+        "posted_at",
+        "updated_at",
+    }
+
+    headers = set(reader.fieldnames or [])
+    missing = sorted(required_columns.difference(headers))
+    if missing:
+        raise ValueError(f"Missing required CSV columns: {', '.join(missing)}")
+
     loads: list[Load] = []
-    for row in reader:
-        # Minimal coercions (the UI/api expects the canonical fields).
+    limit_records = int(max_records) if max_records is not None else None
+    limit_field = int(max_field_length) if max_field_length is not None else None
+
+    for idx, row in enumerate(reader):
+        if limit_records is not None and idx >= limit_records:
+            raise ValueError(f"Too many records (max {limit_records})")
+
+        if limit_field is not None:
+            for k, v in row.items():
+                if v is not None and len(v) > limit_field:
+                    raise ValueError(f"CSV field too long: {k}")
+
         loads.append(
             Load(
                 id=row.get("id") or str(uuid.uuid4()),
@@ -175,7 +223,10 @@ def loads_from_csv_bytes(data: bytes) -> list[Load]:
                 deadhead_miles=float(row["deadhead_miles"]),
                 rate_total_usd=float(row["rate_total_usd"]),
                 rpm=float(row["rpm"]),
-                broker=Broker(name=row.get("broker_name") or "Unknown", rating=float(row.get("broker_rating") or 0.0)),
+                broker=Broker(
+                    name=row.get("broker_name") or "Unknown",
+                    rating=float(row.get("broker_rating") or 0.0),
+                ),
                 detention=bool(_parse_bool(row.get("detention")) or False),
                 multi_stop=bool(_parse_bool(row.get("multi_stop")) or False),
                 lane_history=bool(_parse_bool(row.get("lane_history")) or False),
@@ -184,6 +235,7 @@ def loads_from_csv_bytes(data: bytes) -> list[Load]:
                 updated_at=datetime.fromisoformat(row["updated_at"]),
             )
         )
+
     return loads
 
 

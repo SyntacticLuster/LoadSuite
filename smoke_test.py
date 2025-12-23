@@ -15,6 +15,12 @@ def main() -> None:
     meta = client.get("/api/meta").json()
     assert meta["count"] > 0
 
+    # Ingestion endpoints should exist even when disabled
+    status = client.get("/api/ingestion/status").json()
+    assert "enabled" in status
+    sources = client.get("/api/ingestion/sources").json()
+    assert "enabled" in sources
+
     res = client.get("/api/loads").json()
     assert res["total"] > 0
     first_id = res["loads"][0]["id"]

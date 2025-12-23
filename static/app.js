@@ -36,6 +36,48 @@ const WEATHER_ZIP_STORAGE_KEY = "lb_weather_zip";
 const LAST_SELECTED_LOAD_STORAGE_KEY = "lb_last_selected_load_id";
 const GREENLIGHT_DEFAULTS_STORAGE_KEY = "lb_greenlight_defaults";
 const FILTER_DEFAULTS_STORAGE_KEY = "lb_filter_defaults";
+const UI_PREFS_STORAGE_KEY = "lb_ui_prefs";
+
+const DEFAULT_UI_PREFS = {
+  show_greenlight_ticker: true,
+  show_news_ticker: true,
+  show_sidebar: true,
+  greenlight_full_row: false,
+};
+
+const getUiPrefs = () => {
+  try {
+    const raw = localStorage.getItem(UI_PREFS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const setUiPrefs = (prefs) => {
+  try {
+    localStorage.setItem(UI_PREFS_STORAGE_KEY, JSON.stringify(prefs ?? {}));
+  } catch {}
+};
+
+const applyUiPrefsToShell = () => {
+  const greenlightTicker = document.getElementById("greenlight-ticker");
+  if (greenlightTicker) {
+    greenlightTicker.style.display = state.uiPrefs.show_greenlight_ticker ? "" : "none";
+  }
+
+  const newsTicker = document.getElementById("news-ticker");
+  if (newsTicker) {
+    newsTicker.style.display = state.uiPrefs.show_news_ticker ? "" : "none";
+  }
+
+  // The body reserves space for the bottom ticker. If it's hidden, drop the padding.
+  if (document.body) {
+    document.body.classList.toggle("pb-24", !!state.uiPrefs.show_news_ticker);
+  }
+};
 
 const getWeatherZip = () => {
   try {
@@ -286,6 +328,15 @@ const DEFAULT_QUERY = {
   sort: "composite",
 };
 
+const SORT_OPTIONS = [
+  { value: "composite", label: "Composite" },
+  { value: "score_desc", label: "Score (desc)" },
+  { value: "rpm_desc", label: "$ / mi (desc)" },
+  { value: "pickup_soonest", label: "Pickup (soonest)" },
+  { value: "deadhead_asc", label: "Deadhead (asc)" },
+  { value: "broker_desc", label: "Broker rating (desc)" },
+];
+
 const DEFAULT_PREFS = {
   rpm_min: "",
   equipment: "",
@@ -303,10 +354,11 @@ const state = {
   filtersOpen: false,
   terminalPanelOpen: false,
   ui: {
-    collapseForecast: false,
-    collapseAlerts: false,
+    collapseForecast: true,
+    collapseAlerts: true,
     collapseRouteCast: false,
   },
+  uiPrefs: { ...DEFAULT_UI_PREFS },
   query: { ...DEFAULT_QUERY },
   prefsDraft: { ...DEFAULT_PREFS },
   prefs: { ...DEFAULT_PREFS },
@@ -434,7 +486,13 @@ const renderWeatherSidebar = () => {
     render();
   };
 
-  const card = (title, bodyChildren, titleClass = "", collapseKey = null, { showZipChange, locationLabel } = {}) => {
+  const card = (
+    title,
+    bodyChildren,
+    titleClass = "",
+    collapseKey = null,
+    { showZipChange, locationLabel, alwaysChildren } = {}
+  ) => {
     const isCollapsed = collapseKey ? !!state.ui[collapseKey] : false;
     const toggleBtn = collapseKey
       ? el(
@@ -490,6 +548,7 @@ const renderWeatherSidebar = () => {
           toggleBtn,
         ].filter(Boolean)),
         subRow,
+        ...((alwaysChildren && Array.isArray(alwaysChildren)) ? alwaysChildren : []),
         ...(!isCollapsed ? bodyChildren : []),
       ]
     );
@@ -503,15 +562,37 @@ const renderWeatherSidebar = () => {
 
   // Forecast widget
   const forecastBody = zipOk ? [] : [settingsPrompt];
+  const forecastAlways = [];
   let forecastLocationLabel = "";
   if (zipOk && state.weather.fetchingForecast) {
-    forecastBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading forecast…"]));
+    forecastAlways.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading forecast…"]));
   } else if (zipOk && state.weather.forecastError) {
-    forecastBody.push(el("div", { class: "pt-2 text-xs text-red-600 dark:text-red-400" }, ["Forecast unavailable."]));
+    forecastAlways.push(el("div", { class: "pt-2 text-xs text-red-600 dark:text-red-400" }, ["Forecast unavailable."]));
   } else if (zipOk && state.weather.forecast?.forecast?.periods?.length) {
     const label = state.weather.forecast.location;
     if (label) forecastLocationLabel = label;
     const periods = state.weather.forecast.forecast.periods.slice(0, 4);
+
+    // Keep a compact "Current Conditions" block visible even when collapsed.
+    const current = periods[0];
+    if (current) {
+      const emoji = weatherEmojiForText(current.shortForecast, { isDay: current.isDaytime === false ? false : true });
+      forecastAlways.push(
+        el("div", { class: "pt-3" }, [
+          el("div", { class: "text-xs font-semibold text-slate-600 dark:text-slate-400" }, ["Current Conditions"]),
+          el("div", { class: "pt-1 flex items-baseline justify-between gap-2 text-xs" }, [
+            el("div", { class: "font-semibold text-slate-800 dark:text-slate-200" }, [current.name || "Now"]),
+            el("div", { class: "text-slate-700 dark:text-slate-300" }, [
+              renderTempLabel(current.temperature, current.temperatureUnit, { isDay: !!current.isDaytime }),
+            ]),
+          ]),
+          el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, [
+            `${emoji}${emoji && current.shortForecast ? " " : ""}${current.shortForecast || ""}`,
+          ]),
+        ])
+      );
+    }
+
     for (const p of periods) {
       forecastBody.push(
         el("div", { class: "pt-2 text-xs" }, [
@@ -527,6 +608,11 @@ const renderWeatherSidebar = () => {
         ])
       );
     }
+  }
+
+  if (!zipOk) {
+    // Keep the settings prompt visible even when collapsed.
+    forecastAlways.push(settingsPrompt.cloneNode(true));
   }
 
   // Alerts widget
@@ -559,7 +645,7 @@ const renderWeatherSidebar = () => {
     forecastBody,
     "text-sky-600 dark:text-sky-400",
     "collapseForecast",
-    { showZipChange: true, locationLabel: forecastLocationLabel }
+    { showZipChange: true, locationLabel: forecastLocationLabel, alwaysChildren: forecastAlways }
   );
   const alertsWidget = card(
     "Severe Weather Alerts",
@@ -625,7 +711,7 @@ const renderRouteCastWidget = (loadId, { compact } = { compact: false }) => {
           el("img", {
             src: toAppUrl("/static/images/rc_logo.png"),
             alt: "RouteCast",
-            class: "h-9 w-auto object-contain",
+            class: "h-14 w-auto object-contain",
           }),
         ]
       ),
@@ -890,6 +976,35 @@ const prefStatus = (load) => {
   };
 };
 
+const greenlightGaps = (load) => {
+  const gaps = [];
+  const status = prefStatus(load);
+  const prefs = state.prefs;
+
+  if (parseOptionalNumber(prefs.rpm_min) !== null && status.rpmOk === false) gaps.push("$ / mi min");
+  if (parseOptionalNumber(prefs.weight_max) !== null && status.weightOk === false) gaps.push("Weight max");
+  if (parseOptionalNumber(prefs.weight_min) !== null && status.weightMinOk === false) gaps.push("Weight min");
+  if (prefs.equipment && status.equipmentOk === false) gaps.push("Equipment");
+  if (prefs.detention && status.detentionOk === false) gaps.push("Detention");
+  if (parseOptionalNumber(prefs.broker_rating_min) !== null && status.brokerOk === false) gaps.push("Broker rating");
+  if (parseOptionalNumber(prefs.deadhead_max) !== null && status.deadheadOk === false) gaps.push("Deadhead");
+  if ((prefs.hazmat === "true" || prefs.hazmat === "false") && status.hazmatOk === false) gaps.push("Hazmat pref");
+  if ((prefs.multi_stop === "true" || prefs.multi_stop === "false") && status.multiStopOk === false) gaps.push("Multi-stop pref");
+
+  return gaps;
+};
+
+const buildScoreTooltip = (scoreValue, greenlightOk, load) => {
+  const base = `Score: ${scoreValue.toFixed(1)}/100`;
+  if (greenlightOk) return `${base} • GreenLight`;
+
+  if (!hasActivePrefs()) return `${base} • Scored (set GreenLight prefs to enable endorsement)`;
+
+  const gaps = greenlightGaps(load);
+  if (gaps.length) return `${base} • Scored but not GreenLight: missing ${gaps.join(", ")}`;
+  return `${base} • Scored but not GreenLight`;
+};
+
 const isGreenLight = (load) => {
   const prefs = state.prefs;
   const rpmMin = parseOptionalNumber(prefs.rpm_min);
@@ -981,6 +1096,23 @@ const setMeta = async () => {
   }
 };
 
+const renderScoreLegend = () => {
+  const pill = (label, cls) =>
+    el("span", { class: `inline-flex items-center rounded-full px-2 py-0.5 text-[0.65rem] font-semibold ${cls}` }, [label]);
+
+  const greenlightLegendCls =
+    "border-emerald-400 bg-emerald-50/80 text-slate-900 shadow-[0_0_0_1px_rgba(16,185,129,0.45)] dark:border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-50";
+  return el("div", { class: "flex flex-wrap items-center justify-end gap-2 text-[0.7rem]" }, [
+    el("span", { class: "text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wide" }, ["Legend:"]),
+    pill("GreenLight", greenlightLegendCls),
+    pill("Scored", "bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100"),
+    pill(
+      "Warnings/Fails",
+      "border border-amber-300 bg-gradient-to-r from-yellow-200 via-amber-200 to-red-200 text-red-900"
+    ),
+  ]);
+};
+
 const renderFatalError = (root, title, detail) => {
   const box = el(
     "div",
@@ -1004,6 +1136,8 @@ const render = async () => {
   root.innerHTML = "";
 
   try {
+    // Keep shell-level UI (tickers/padding) in sync with settings.
+    applyUiPrefsToShell();
     const route = getHashRoute();
     if (route.page === "settings") return await renderSettings(root);
     if (route.page === "load" && route.id) return await renderDetail(root, route.id);
@@ -1016,7 +1150,7 @@ const render = async () => {
 
 const renderList = async (root) => {
   const layout = el("div", { class: "lg:flex lg:gap-4" });
-  const sidebar = renderWeatherSidebar();
+  const sidebar = state.uiPrefs.show_sidebar ? renderWeatherSidebar() : null;
   const main = el("div", { class: "min-w-0 flex-1" });
 
   const top = el("div", { class: "space-y-3" });
@@ -1053,42 +1187,13 @@ const renderList = async (root) => {
       },
     },
     [
-      state.filtersOpen ? "Hide Filters, Sort &  " : "Show Filters, Sort &  ",
-      el("span", { class: "inline-flex items-center align-middle" }, [
-        el("img", {
-          src: toAppUrl("/static/images/gl_glyph.png"),
-          alt: "GreenLight",
-          class: "inline-block align-middle h-4 w-4 transform scale-150",
-        }),
-        el(
-          "span",
-          {
-            class:
-              "ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900 dark:text-green-200",
-          },
-          ["GreenLight"]
-        ),
-      ]),
+      state.filtersOpen ? "Hide Filters & GreenLight" : "Show Filters & GreenLight",
     ]
-  );
-
-  // Terminal workflows toggle button
-  const terminalBtn = el(
-    "button",
-    {
-      class:
-        "w-full rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
-      onclick: () => {
-        state.terminalPanelOpen = !state.terminalPanelOpen;
-        render();
-      },
-    },
-    [state.terminalPanelOpen ? "Hide Terminal Workflows" : "📋 Terminal Workflows"]
   );
 
   top.appendChild(searchRow);
 
-  top.appendChild(el("div", { class: "grid grid-cols-2 gap-2" }, [filtersBtn, terminalBtn]));
+  top.appendChild(filtersBtn);
 
   if (state.filtersOpen) {
     const panels = el(
@@ -1101,16 +1206,39 @@ const renderList = async (root) => {
     top.appendChild(panels);
   }
 
-  if (state.terminalPanelOpen) {
-    top.appendChild(renderTerminalPanel());
-  }
+  // Terminal workflows panel intentionally hidden from the main header now.
+
+  const sortSelect = (() => {
+    const s = el(
+      "select",
+      {
+        class:
+          "rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100",
+        onchange: (e) => (state.query.sort = e.target.value),
+      },
+      SORT_OPTIONS.map((o) => el("option", { value: o.value }, [o.label]))
+    );
+    s.value = state.query.sort || "composite";
+    return s;
+  })();
 
   const listWrap = el("div", { class: "pt-2" }, [
-    el("div", { class: "text-xs text-slate-600 dark:text-slate-400" }, ["Results update on Search."]),
+    el(
+      "div",
+      { class: "flex flex-col gap-2 text-xs text-slate-600 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between" },
+      [
+        el("div", {}, ["Results update on Search."]),
+        el("div", { class: "flex items-center gap-2 sm:flex-1 sm:justify-center" }, [
+          el("div", { class: "font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" }, ["Sort:"]),
+          sortSelect,
+        ]),
+        renderScoreLegend(),
+      ]
+    ),
   ]);
   top.appendChild(listWrap);
   main.appendChild(top);
-  layout.appendChild(sidebar);
+  if (sidebar) layout.appendChild(sidebar);
   layout.appendChild(main);
   root.appendChild(layout);
 
@@ -1165,19 +1293,17 @@ const renderList = async (root) => {
       ? "text-sm font-semibold text-green-400 dark:text-green-300"
       : "text-sm font-semibold";
 
-    // Build score badge
+    // Build score + verdict badges (neutral pill; green tint only when endorsed)
     const scoreBadge = hasScore
       ? el(
           "span",
           {
-            class: `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-              scoreValue >= 70
-                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                : scoreValue >= 50
-                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+            class: `inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
+              greenlightOk
+                ? "border-emerald-400 bg-emerald-50/80 text-slate-900 shadow-[0_0_0_1px_rgba(16,185,129,0.45)] dark:border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-50"
+                : "border-slate-300 bg-slate-100 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             }`,
-            title: `Score: ${scoreValue.toFixed(1)}/100`,
+            title: buildScoreTooltip(scoreValue, greenlightOk, load),
           },
           [`${scoreValue.toFixed(0)}`]
         )
@@ -1185,23 +1311,35 @@ const renderList = async (root) => {
 
     const scoreCluster = hasScore
       ? (() => {
-          const greenlightGlyph = el(
-            "span",
-            {
-              class: greenlightOk
-                ? "mr-1 inline-flex items-center"
-                : "mr-1 inline-flex items-center invisible",
-            },
-            [
-              el("img", {
-                src: toAppUrl("/static/images/gl_glyph.png"),
-                alt: "GreenLight",
-                class: "inline-block align-middle h-4 w-4 transform scale-150",
-              }),
-            ]
-          );
+          const glyph = greenlightOk
+            ? el(
+                "span",
+                { class: "mr-1 inline-flex items-center" },
+                [
+                  el("img", {
+                    src: toAppUrl("/static/images/gl_glyph.png"),
+                    alt: "GreenLight",
+                    class: "inline-block align-middle h-4 w-4 transform scale-150",
+                  }),
+                ]
+              )
+            : null;
+
+          const verdictBadge = greenlightOk
+            ? null
+            : el(
+                "span",
+                {
+                  class:
+                    "mr-1 inline-flex items-center rounded-full px-2 py-0.5 text-[0.7rem] font-semibold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100",
+                  title: "Scored (not GreenLight)",
+                },
+                ["Scored"]
+              );
+
           return el("div", { class: "flex items-center" }, [
-            greenlightGlyph,
+            glyph,
+            verdictBadge,
             scoreBadge,
           ].filter(Boolean));
         })()
@@ -1251,7 +1389,12 @@ const renderList = async (root) => {
         href: `${appBasePath}#/load/${load.id}`,
         onclick: () => setLastSelectedLoadId(load.id),
         class:
-          "block rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800",
+          [
+            "block rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800",
+            state.uiPrefs.greenlight_full_row && greenlightOk ? "lg:col-span-2" : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
       },
       [
         el("div", { class: "flex items-start justify-between gap-2" }, [
@@ -1397,21 +1540,11 @@ const renderPrefsPanel = () => {
       row(
         el("span", { class: "inline-flex items-center gap-2" }, [
           "Sort by",
-          el("span", { class: "inline-flex items-center" }, [
-            el("img", {
-              src: toAppUrl("/static/images/gl_glyph.png"),
-              alt: "GreenLight",
-              class: "inline-block align-middle h-4 w-4 transform scale-150",
-            }),
-            el(
-              "span",
-              {
-                class:
-                  "ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900 dark:text-green-200",
-              },
-              ["GreenLight"]
-            ),
-          ]),
+          el("img", {
+            src: toAppUrl("/static/images/gl_glyph.png"),
+            alt: "GreenLight",
+            class: "inline-block align-middle h-4 w-4 transform scale-150",
+          }),
         ]),
         el("div", { class: "flex items-center justify-end gap-4" }, [
           el("label", { class: "flex items-center gap-2 text-sm" }, [
@@ -1449,25 +1582,7 @@ const renderPrefsPanel = () => {
         render();
       },
     },
-    [
-      "Apply",
-      el("span", { class: "inline-flex items-center align-middle" }, [
-        el("img", {
-          src: toAppUrl("/static/images/gl_glyph.png"),
-          alt: "GreenLight",
-          class: "inline-block align-middle h-4 w-4 transform scale-150",
-        }),
-        el(
-          "span",
-          {
-            class:
-              "ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900 dark:text-green-200",
-          },
-          ["GreenLight"]
-        ),
-      ]),
-      "parameters",
-    ]
+    ["Apply"]
   );
   wrap.appendChild(applyBtn);
 
@@ -1658,13 +1773,7 @@ const renderFiltersPanel = () => {
     el("div", { class: "grid gap-2" }, [
       row(
         "Sort",
-        sel("sort", [
-          { value: "composite", label: "Composite" },
-          { value: "rpm_desc", label: "$ / mi (desc)" },
-          { value: "pickup_soonest", label: "Pickup (soonest)" },
-          { value: "deadhead_asc", label: "Deadhead (asc)" },
-          { value: "broker_desc", label: "Broker rating (desc)" },
-        ])
+        sel("sort", SORT_OPTIONS)
       ),
       row("Equipment", sel("equipment", [
         { value: "Dry Van", label: "Dry Van" },
@@ -1772,6 +1881,9 @@ const renderDetail = async (root, id) => {
   await fetchWatchlist();
   const isWatched = state.watchlist.has(id);
 
+  // GreenLight verdict for this load
+  const greenlightOk = hasActivePrefs() && isGreenLight(load);
+
   // Persist last selected load for RouteCast on the main screen
   setLastSelectedLoadId(id);
 
@@ -1781,24 +1893,23 @@ const renderDetail = async (root, id) => {
     ["← Back"]
   );
 
-  // Score badge and GreenLight indicator
+  // Score badge and GreenLight indicator (neutral pill, tint only when endorsed)
   const scoreBadge = scoreData
     ? el(
         "div",
         {
-          class: `inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${
-            scoreData.score >= 70
-              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-              : scoreData.score >= 50
-              ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+          class: `inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold ${
+            greenlightOk
+              ? "border-emerald-400 bg-emerald-50/80 text-slate-900 shadow-[0_0_0_1px_rgba(16,185,129,0.45)] dark:border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-50"
+              : "border-slate-300 bg-slate-100 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           }`,
+          title: buildScoreTooltip(scoreData.score, greenlightOk, load),
         },
         [`Score: ${scoreData.score.toFixed(1)}`]
       )
     : null;
 
-  const greenlightBadge = scoreBadge && hasActivePrefs() && isGreenLight(load)
+  const greenlightGlyph = scoreBadge && greenlightOk
     ? el("span", { class: "mr-1 inline-flex items-center" }, [
         el("img", {
           src: toAppUrl("/static/images/gl_glyph.png"),
@@ -1806,6 +1917,22 @@ const renderDetail = async (root, id) => {
           class: "inline-block align-middle h-4 w-4 transform scale-150",
         }),
       ])
+    : null;
+
+  const verdictBadge = scoreBadge && !greenlightOk
+    ? el(
+        "span",
+        {
+          class:
+            "mr-1 inline-flex items-center rounded-full px-2 py-0.5 text-[0.75rem] font-semibold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100",
+          title: "Scored (not GreenLight)",
+        },
+        ["Scored"]
+      )
+    : null;
+
+  const scoreCluster = scoreBadge
+    ? el("div", { class: "flex items-center" }, [greenlightGlyph, verdictBadge, scoreBadge].filter(Boolean))
     : null;
 
   // Top reasons section
@@ -1846,10 +1973,7 @@ const renderDetail = async (root, id) => {
       el("div", { class: "text-base font-semibold" }, [
         `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
       ]),
-      el("div", { class: "flex items-center" }, [
-        greenlightBadge,
-        scoreBadge,
-      ].filter(Boolean)),
+      scoreCluster,
     ]),
     el("div", { class: "pt-2 text-sm" }, [
       el("div", { class: "flex justify-between" }, [
@@ -1932,6 +2056,33 @@ const renderSettings = async (root) => {
   ]);
   themeRow.appendChild(themeWrap);
   box.appendChild(themeRow);
+
+  // Terminal UI prefs
+  const uiRow = el("div", { class: "text-sm" }, [
+    el("div", { class: "font-semibold" }, ["Terminal UI"]),
+  ]);
+
+  const uiToggle = (label, key) =>
+    el("label", { class: "mt-2 flex items-center justify-between gap-3" }, [
+      el("div", { class: "text-slate-700 dark:text-slate-300" }, [label]),
+      el("input", {
+        type: "checkbox",
+        class: "h-5 w-5",
+        checked: state.uiPrefs[key] ? "checked" : undefined,
+        onchange: (e) => {
+          state.uiPrefs[key] = !!e.target.checked;
+          setUiPrefs(state.uiPrefs);
+          applyUiPrefsToShell();
+          render();
+        },
+      }),
+    ]);
+
+  uiRow.appendChild(uiToggle("Show GreenLight ticker", "show_greenlight_ticker"));
+  uiRow.appendChild(uiToggle("Show Freight Alerts ticker", "show_news_ticker"));
+  uiRow.appendChild(uiToggle("Show sidebar", "show_sidebar"));
+  uiRow.appendChild(uiToggle("GreenLight cards take full row", "greenlight_full_row"));
+  box.appendChild(uiRow);
 
   // Weather ZIP override
   if (!state.weather.zipDraft) state.weather.zipDraft = state.weather.zip || "";
@@ -2176,6 +2327,11 @@ state.lastSelectedLoadId = getLastSelectedLoadId();
 {
   const defaults = getFilterDefaults();
   if (defaults) state.query = { ...DEFAULT_QUERY, ...defaults, q: "" };
+}
+{
+  const defaults = getUiPrefs();
+  if (defaults) state.uiPrefs = { ...state.uiPrefs, ...defaults };
+  applyUiPrefsToShell();
 }
 setMeta().then(render);
 initNewsTicker();

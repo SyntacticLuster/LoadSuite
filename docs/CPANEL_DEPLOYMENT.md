@@ -80,7 +80,7 @@ psql "$DATABASE_URL" -f scripts/schema.sql
 
 ```bash
 # SSH into your server
-ssh username@orbitsuite.cloud
+ssh -p 21098 username@orbitsuite.cloud
 
 # Navigate to web directory
 cd ~/public_html
@@ -90,6 +90,20 @@ mkdir -p ~/apps && cd ~/apps
 # Clone the repository
 git clone https://github.com/SyntacticLuster/LoadSuite.git
 cd LoadSuite
+```
+
+For subsequent updates (after initial setup), you can use the repo’s helper script from your local machine:
+
+```bash
+DEPLOY_SSH_HOST=orbitsuite.cloud \
+DEPLOY_SSH_USER=<your_cpanel_username> \
+./scripts/deploy_cpanel.sh
+```
+
+If you configured an SSH host alias locally (e.g. `Host loadsuite-prod` in `~/.ssh/config`), you can run:
+
+```bash
+DEPLOY_SSH_TARGET=loadsuite-prod ./scripts/deploy_cpanel.sh
 ```
 
 ### Option B: File Upload via cPanel File Manager

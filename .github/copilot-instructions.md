@@ -11,7 +11,7 @@
   - Factor weights/thresholds: `app/scoring/config.py`
 
 ## Current vs target flows (design for seamless migration)
-- Current API entrypoint is `app/main.py` (also serves `static/`). Some endpoints still read from module-level in-memory state (`_dataset`, `preferences_store`, etc.).
+- Current API entrypoint is `app/main.py` (also serves `static/`). Runtime state lives in `app.state.ctx` (`AppContext`). Avoid module-level state for request paths.
 - When adding/changing endpoints, structure code so swapping storage is trivial:
   - Put orchestration in a service (e.g., `ScoringService`) and call it from `app/main.py`.
   - Access data via `LoadRepository` / `PreferencesRepository` / `MarketDataRepository` (not global lists) when feasible.

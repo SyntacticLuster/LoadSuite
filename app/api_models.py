@@ -10,7 +10,7 @@ Provides Pydantic models for the extended API:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,39 @@ from .models import Load
 # =============================================================================
 # Factor/Score Response Models
 # =============================================================================
+
+# =============================================================================
+# RouteCast Models
+# =============================================================================
+
+
+class CoordinateModel(BaseModel):
+    lat: float
+    lon: float
+
+
+class RouteCastScoreRequest(BaseModel):
+    origin: CoordinateModel
+    destination: CoordinateModel
+    via: List[CoordinateModel] = Field(default_factory=list)
+    equipment_type: Optional[str] = None
+    weight_lbs: Optional[float] = Field(default=None, ge=0)
+    departure_time: Optional[datetime] = None
+
+
+class RouteCastScoreResponse(BaseModel):
+    overlays: List[Any] = Field(default_factory=list)
+    risk_score: Optional[float] = None
+    summary: str
+    reasons: List[str] = Field(default_factory=list)
+    provider: str
+    confidence: str
+
+
+# =============================================================================
+# Factor/Score Response Models
+# =============================================================================
+
 
 class FactorResultModel(BaseModel):
     """API representation of a scoring factor result."""
@@ -53,6 +86,10 @@ class ScoredLoadModel(BaseModel):
     greenlight: bool = Field(
         default=False,
         description="Whether load meets user's GreenLight threshold"
+    )
+    routecast: Optional[RouteCastScoreResponse] = Field(
+        default=None,
+        description="RouteCast route risk data when requested",
     )
 
 

@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "routecast-api"
+version = "0.1.0"
+description = "RouteCast API service"
+authors = ["LoadSuite Team <dev@example.com>"]
+package-mode = true
+packages = [{ include = "routecast_api" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.125.0"
+uvicorn = "^0.38.0"
+routecast-core = { path = "../../packages/routecast-core", develop = true }
+routecast-sources = { path = "../../packages/routecast-sources", develop = true }
+routecast-routing = { path = "../../packages/routecast-routing", develop = true }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+httpx = "^0.27.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
