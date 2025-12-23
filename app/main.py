@@ -47,7 +47,7 @@ from .api_models import (
     WatchlistResponse,
 )
 from .routecast_cache import RouteCastCache
-from .stores import AlertRulesStore, FilterPresetsStore, PreferencesStore, WatchlistStore
+from .stores import AlertRulesStore, FilterPresetsStore, PersistentWatchlistStore, PreferencesStore, WatchlistStore
 from .scoring import ScoringEngine
 from .scoring.models import UserPreferences
 from .weather import (
@@ -95,6 +95,12 @@ def _likely_worker_count() -> int | None:
 
 
 def _build_default_ctx() -> AppContext:
+    watchlist_store: WatchlistStore
+    if settings.environment in ("production", "staging") and not settings.use_database:
+        watchlist_store = PersistentWatchlistStore(BASE_DIR / ".runtime" / "watchlist.json")
+    else:
+        watchlist_store = WatchlistStore()
+
     return AppContext(
         dataset=generate_synthetic_loads(settings.synthetic_load_count),
         scoring_engine=ScoringEngine(),
@@ -107,7 +113,7 @@ def _build_default_ctx() -> AppContext:
         ingestion_manager=None,
         ingestion_task=None,
         preferences_store=PreferencesStore(),
-        watchlist_store=WatchlistStore(),
+        watchlist_store=watchlist_store,
         alert_rules_store=AlertRulesStore(),
         filter_presets_store=FilterPresetsStore(),
     )
@@ -168,9 +174,10 @@ async def lifespan(app: FastAPI):
         logger.info("Database health: %s", health["status"])
 
     # Attach live context to app.state for DI.
-    # Note: tests instantiate TestClient(app) without running lifespan, so we
-    # also initialize a default ctx at module import time. Don't overwrite it.
-    if getattr(app.state, "ctx", None) is None:
+    # Production servers run multiple processes; rebuild ctx here so the
+    # correct persistence choices are applied. In tests, avoid clobbering the
+    # pre-seeded ctx (many tests don't run lifespan).
+    if os.environ.get("PYTEST_CURRENT_TEST") is None or getattr(app.state, "ctx", None) is None:
         app.state.ctx = _build_default_ctx()
 
     # Ingestion (in-memory, additive)
