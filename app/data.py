@@ -207,6 +207,47 @@ def loads_from_csv_bytes(
                 if v is not None and len(v) > limit_field:
                     raise ValueError(f"CSV field too long: {k}")
 
+        row_number = idx + 1
+
+        def _coerce_float(value, field: str, *, allow_blank: bool = False, none_on_non_numeric: bool = False) -> float | None:
+            if value is None:
+                if allow_blank:
+                    return None
+                raise ValueError(f"Row {row_number}: missing {field}")
+
+            if isinstance(value, str):
+                value = value.strip()
+                if value == "":
+                    if allow_blank:
+                        return None
+                    raise ValueError(f"Row {row_number}: missing {field}")
+
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                if none_on_non_numeric:
+                    return None
+                raise ValueError(f"Row {row_number}: invalid {field}") from None
+
+        distance_miles = _coerce_float(row.get("distance_miles"), "distance_miles", allow_blank=True)
+        rate_total_usd = _coerce_float(row.get("rate_total_usd"), "rate_total_usd", allow_blank=True)
+        rpm = _coerce_float(row.get("rpm"), "rpm", allow_blank=True, none_on_non_numeric=True)
+
+        if rpm is None or rpm <= 0:
+            if distance_miles is None:
+                raise ValueError(f"Row {row_number}: missing distance_miles for rpm synthesis")
+            if rate_total_usd is None:
+                raise ValueError(f"Row {row_number}: missing rate_total_usd for rpm synthesis")
+
+            rpm = round(rate_total_usd / max(distance_miles, 1.0), 3)
+        else:
+            rpm = round(rpm, 3)
+
+        deadhead_miles = _coerce_float(row.get("deadhead_miles"), "deadhead_miles") or 0.0
+        broker_rating = _coerce_float(
+            row.get("broker_rating"), "broker_rating", allow_blank=True, none_on_non_numeric=True
+        )
+
         loads.append(
             Load(
                 id=row.get("id") or str(uuid.uuid4()),
@@ -219,13 +260,13 @@ def loads_from_csv_bytes(
                 equipment=row["equipment"],
                 weight_lbs=int(row["weight_lbs"]),
                 hazmat=bool(_parse_bool(row.get("hazmat")) or False),
-                distance_miles=float(row["distance_miles"]),
-                deadhead_miles=float(row["deadhead_miles"]),
-                rate_total_usd=float(row["rate_total_usd"]),
-                rpm=float(row["rpm"]),
+                distance_miles=distance_miles if distance_miles is not None else 0.0,
+                deadhead_miles=deadhead_miles,
+                rate_total_usd=rate_total_usd if rate_total_usd is not None else 0.0,
+                rpm=rpm,
                 broker=Broker(
                     name=row.get("broker_name") or "Unknown",
-                    rating=float(row.get("broker_rating") or 0.0),
+                    rating=broker_rating if broker_rating is not None else 0.0,
                 ),
                 detention=bool(_parse_bool(row.get("detention")) or False),
                 multi_stop=bool(_parse_bool(row.get("multi_stop")) or False),
