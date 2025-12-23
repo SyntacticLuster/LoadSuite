@@ -721,7 +721,7 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
     isCollapsed && hasRouteAlerts
       ? el(
           "div",
-          { class: "pt-1 text-[0.65rem] font-semibold text-red-600 dark:text-red-400" },
+          { class: "pt-1 text-xs font-semibold text-red-600 dark:text-red-400" },
           ["Alerts exist on route"]
         )
       : null,
