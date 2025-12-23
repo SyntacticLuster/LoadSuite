@@ -59,6 +59,7 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
+STATIC_IMAGES_DIR = STATIC_DIR / "images"
 
 
 def _likely_worker_count() -> int | None:
@@ -945,6 +946,88 @@ def delete_filter_preset(
 
 # Static UI
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+def _static_file(path: str) -> FileResponse:
+    resolved = (STATIC_IMAGES_DIR / path).resolve()
+    # Simple traversal guard.
+    if not str(resolved).startswith(str(STATIC_IMAGES_DIR.resolve())):
+        raise HTTPException(status_code=400, detail="Invalid static path")
+    if not resolved.exists():
+        raise HTTPException(status_code=404, detail="Static asset not found")
+    return FileResponse(str(resolved))
+
+
+# Favicons / PWA assets at domain root (browsers often request these from '/').
+@app.get("/favicon.ico")
+def favicon() -> FileResponse:
+    # Recommended default: backgrounded version so it doesn't disappear on light tabs.
+    return _static_file("favicon-bg.ico")
+
+
+@app.get("/favicon-bg.ico")
+def favicon_bg() -> FileResponse:
+    return _static_file("favicon-bg.ico")
+
+
+@app.get("/favicon-transparent.ico")
+def favicon_transparent() -> FileResponse:
+    return _static_file("favicon.ico")
+
+
+@app.get("/favicon-16x16.png")
+def favicon_16() -> FileResponse:
+    return _static_file("favicon-16x16.png")
+
+
+@app.get("/favicon-32x32.png")
+def favicon_32() -> FileResponse:
+    return _static_file("favicon-32x32.png")
+
+
+@app.get("/favicon-48x48.png")
+def favicon_48() -> FileResponse:
+    return _static_file("favicon-48x48.png")
+
+
+@app.get("/favicon-bg-16x16.png")
+def favicon_bg_16() -> FileResponse:
+    return _static_file("favicon-bg-16x16.png")
+
+
+@app.get("/favicon-bg-32x32.png")
+def favicon_bg_32() -> FileResponse:
+    return _static_file("favicon-bg-32x32.png")
+
+
+@app.get("/favicon-bg-48x48.png")
+def favicon_bg_48() -> FileResponse:
+    return _static_file("favicon-bg-48x48.png")
+
+
+@app.get("/apple-touch-icon.png")
+def apple_touch_icon() -> FileResponse:
+    return _static_file("apple-touch-icon.png")
+
+
+@app.get("/android-chrome-192x192.png")
+def android_192() -> FileResponse:
+    return _static_file("android-chrome-192x192.png")
+
+
+@app.get("/android-chrome-512x512.png")
+def android_512() -> FileResponse:
+    return _static_file("android-chrome-512x512.png")
+
+
+@app.get("/android-chrome-512x512-maskable.png")
+def android_512_maskable() -> FileResponse:
+    return _static_file("android-chrome-512x512-maskable.png")
+
+
+@app.get("/site.webmanifest")
+def site_manifest() -> FileResponse:
+    return _static_file("site.webmanifest")
 
 
 @app.get("/")
