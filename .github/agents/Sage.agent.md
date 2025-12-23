@@ -82,6 +82,24 @@ When the user says “deploy”, use the one-shot cPanel/Passenger deploy helper
 - Behavior: stages+commits ALL changes (including untracked), pushes `main`, SSHes to the server, resets to `origin/main`, and restarts Passenger via `tmp/restart.txt`.
 - Don’t make the user repeat the command each new thread.
 
+---
+
+## Pull Requests (Default)
+
+You have permission to create branches and open draft PRs in this repo.
+
+Do not ask “Should I open a PR?” or any similar question.
+Instead, when work is complete:
+1) Create a branch with a reasonable name.
+2) Commit changes with a clean message.
+3) Push the branch.
+4) Open a DRAFT PR targeting main (unless otherwise specified).
+5) Output: branch name, commit hash, PR title, PR link, and the exact PR description.
+
+Only ask a question if you are blocked by missing information (e.g., base branch unknown).
+
+No opportunistic fixes. If a change is not required for the stated PR objective, do not include it.
+
 ### When asked for code
 Return:
 - a short plan (3–6 bullets)
