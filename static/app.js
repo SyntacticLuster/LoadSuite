@@ -617,6 +617,8 @@ const renderWeatherSidebar = () => {
   // Alerts widget
   const alertsBody = zipOk ? [] : [settingsPrompt.cloneNode(true)];
   let alertsLocationLabel = "";
+  let alertsTitle = "Severe Weather Alerts";
+  let alertsTitleClass = "text-red-600 dark:text-red-400";
   if (zipOk && state.weather.fetchingAlerts) {
     alertsBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading alerts…"]));
   } else if (zipOk && state.weather.alertsError) {
@@ -625,6 +627,15 @@ const renderWeatherSidebar = () => {
     const alertsLabel = state.weather.alerts?.location;
     if (alertsLabel) alertsLocationLabel = alertsLabel;
     const items = state.weather.alerts?.alerts?.alerts || [];
+    const hasAlerts = items.length > 0;
+    if (hasAlerts) {
+      alertsTitle = el(
+        "span",
+        { class: "alert-pill alert-flash-text" },
+        ["Severe Weather Alerts"]
+      );
+      alertsTitleClass = "";
+    }
     if (!items.length) {
       alertsBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["No active alerts."]));
     } else {
@@ -647,9 +658,9 @@ const renderWeatherSidebar = () => {
     { showZipChange: true, locationLabel: forecastLocationLabel, alwaysChildren: forecastAlways }
   );
   const alertsWidget = card(
-    "Severe Weather Alerts",
+    alertsTitle,
     alertsBody,
-    "text-red-600 dark:text-red-400",
+    alertsTitleClass,
     "collapseAlerts",
     { showZipChange: true, locationLabel: alertsLocationLabel }
   );

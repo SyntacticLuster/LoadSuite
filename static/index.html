@@ -81,6 +81,38 @@
           transform: translateX(-50%);
         }
       }
+      .alert-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.15rem 0.9rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(248, 113, 113, 0.6);
+        background: linear-gradient(180deg, rgba(220, 38, 38, 0.95), rgba(239, 68, 68, 0.9));
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: #fde68a;
+        box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.35);
+      }
+
+      .alert-flash-text {
+        animation: alert-flash 1.4s ease-in-out infinite;
+      }
+
+      @keyframes alert-flash {
+        0%,
+        100% {
+          color: #dc2626;
+        }
+        25%,
+        75% {
+          color: #fcd34d;
+        }
+        50% {
+          color: #b91c1c;
+        }
+      }
     </style>
   </head>
   <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 pb-24">
