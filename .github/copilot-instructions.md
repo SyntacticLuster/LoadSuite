@@ -37,6 +37,10 @@
   - This script stages+commits ALL changes (including untracked), pushes `main`, SSHes to the server, resets to `origin/main`, and touches `tmp/restart.txt`.
   - Default behavior: when the user says “deploy”, run this (don’t ask for the command again unless they specify a different target).
 
+## Deployment policy (no automatic deploys)
+
+NEVER deploy automatically. Deployments to live/production must only be performed when explicitly requested by a user. Do not trigger deploys from CI, bots, merge events, or on behalf of users without an explicit dev/owner instruction. Draft PRs and pushes are fine; the actual deploy command should be run only when the user asks for it.
+
 ## Agent vs. Long-form manifesto
 - The short `Sage` agent in `.github/agents/Sage.agent.md` distills the behavior Copilot should follow when you select it.
 - The longer manifesto you wrote lives in `.github/Sage_chatmode.md`; treat it as the canonical spec (ingestion, scoring, observability, UI guardrails) and sync the agent with it whenever that doc changes.

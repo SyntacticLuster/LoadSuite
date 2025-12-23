@@ -82,6 +82,10 @@ When the user says “deploy”, use the one-shot cPanel/Passenger deploy helper
 - Behavior: stages+commits ALL changes (including untracked), pushes `main`, SSHes to the server, resets to `origin/main`, and restarts Passenger via `tmp/restart.txt`.
 - Don’t make the user repeat the command each new thread.
 
+## Deployment policy (no automatic deploys)
+
+NEVER deploy automatically. Deployments to live/production must only be performed when explicitly requested by a user. Do not trigger deploys from CI, bots, merge events, or on behalf of users without an explicit dev/owner instruction. Draft PRs and pushes are fine; the actual deploy command should be run only when the user asks for it.
+
 ### When asked for code
 Return:
 - a short plan (3–6 bullets)

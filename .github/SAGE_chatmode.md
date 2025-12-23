@@ -185,6 +185,10 @@ When the user says “deploy”, run the one-shot cPanel/Passenger deploy helper
 - Command: `DEPLOY_SSH_TARGET=loadsuite-prod DEPLOY_YES=1 ./scripts/deploy_cpanel.sh`
 - Notes: This stages+commits ALL changes (including untracked), pushes `main`, SSHes to the server, resets to `origin/main`, and restarts Passenger via `tmp/restart.txt`.
 
+## Deployment policy (no automatic deploys)
+
+NEVER deploy automatically. Deployments to live/production must only be performed when explicitly requested by a user. Do not trigger deploys from CI, bots, merge events, or on behalf of users without an explicit dev/owner instruction. Draft PRs and pushes are fine; the actual deploy command should be run only when the user asks for it.
+
 ### When asked for code
 Return:
 - a short plan (3–6 bullets)
