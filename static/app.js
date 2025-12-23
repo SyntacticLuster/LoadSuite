@@ -1590,7 +1590,7 @@ const renderPrefsPanel = () => {
     "button",
     {
       class:
-        "mt-3 w-full flex items-center justify-center gap-2 rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600",
+        "mt-3 w-full flex items-center justify-center gap-2 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
       onclick: () => {
         state.prefs = { ...state.prefsDraft };
         render();
@@ -1659,7 +1659,7 @@ const renderTerminalPanel = () => {
       "button",
       {
         class:
-          "shrink-0 rounded-md bg-emerald-600 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-700",
+          "shrink-0 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
         onclick: () => {
           const name = presetNameInput.value.trim();
           if (name) {
@@ -1825,7 +1825,7 @@ const renderFiltersPanel = () => {
         "button",
         {
           class:
-            "w-full rounded-md bg-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600",
+            "w-full rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
           onclick: () => render(),
         },
         ["Apply"]
