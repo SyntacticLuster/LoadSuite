@@ -21,6 +21,7 @@ from .data import Dataset, generate_synthetic_loads, loads_from_csv_bytes, write
 from .deps import get_ctx, get_ingestion, get_routecast_client, get_scoring
 from .filters import apply_filters, apply_sort
 from .ingestion.manager import IngestionManager
+from .ingestion.models import Provenance
 from .models import Load, LoadsQuery, RefreshRequest
 from .news import get_news_items
 from .metrics import get_metrics_text
@@ -43,6 +44,8 @@ from .api_models import (
     ScoredLoadsResponse,
     TriggeredAlertModel,
     TriggeredAlertsResponse,
+    TrustResponse,
+    TrustReason,
     WatchlistItemCreateRequest,
     WatchlistItemModel,
     WatchlistResponse,
@@ -283,6 +286,118 @@ app.state.ctx = _build_default_ctx()
 
 # Default user ID for anonymous/demo usage
 DEFAULT_USER_ID = "default"
+
+
+def _compute_trust(load: Load, provenance: Provenance | None, now: datetime) -> TrustResponse:
+    reasons: list[TrustReason] = []
+
+    def _add_reason(factor: str, label: str, contribution: int, details: str) -> None:
+        reasons.append(TrustReason(factor=factor, label=label, contribution=contribution, details=details))
+
+    score = 60
+
+    core_present = load.distance_miles > 0 and load.rate_total_usd > 0 and load.rpm > 0
+    core_partial = any([load.distance_miles > 0, load.rate_total_usd > 0, load.rpm > 0]) and not core_present
+
+    if core_present:
+        score += 20
+        _add_reason(
+            "core_fields_present",
+            "Core fields verified",
+            20,
+            "Distance, rate, and RPM present",
+        )
+    elif core_partial:
+        score += 8
+        _add_reason(
+            "core_fields_partial",
+            "Some core fields estimated",
+            8,
+            "At least one of distance, rate, or RPM is missing",
+        )
+    else:
+        score -= 10
+        _add_reason(
+            "core_fields_missing",
+            "Core fields missing",
+            -10,
+            "Distance, rate, and RPM are unavailable",
+        )
+
+    if provenance and provenance.source_record_id:
+        score += 5
+        _add_reason(
+            "provenance_record_id",
+            "Source record ID present",
+            5,
+            "Source provided a record identifier",
+        )
+    else:
+        score -= 5
+        _add_reason(
+            "provenance_missing_record_id",
+            "Source record ID missing",
+            -5,
+            "No source record identifier available",
+        )
+
+    updated_at = provenance.source_updated_at if provenance else None
+    if updated_at:
+        score += 5
+        _add_reason(
+            "provenance_updated_at",
+            "Source timestamp present",
+            5,
+            "Source provided a last-updated timestamp",
+        )
+        age_seconds = (now - updated_at).total_seconds()
+        if age_seconds > 43200:
+            score -= 15
+            _add_reason(
+                "data_expired",
+                "Data is expired (>12h old)",
+                -15,
+                "Source timestamp older than 12 hours",
+            )
+        elif age_seconds > 14400:
+            score -= 8
+            _add_reason(
+                "data_stale",
+                "Data is stale (4-12h old)",
+                -8,
+                "Source timestamp older than 4 hours",
+            )
+    else:
+        score -= 5
+        _add_reason(
+            "provenance_missing_updated_at",
+            "Source timestamp missing",
+            -5,
+            "No source last-updated timestamp available",
+        )
+
+    rpm_derived = load.rpm <= 0 or load.distance_miles <= 0 or load.rate_total_usd <= 0
+    if rpm_derived:
+        score -= 10
+        _add_reason(
+            "rpm_derived",
+            "RPM was estimated",
+            -10,
+            "RPM derived because rate or distance was missing",
+        )
+
+    if load.distance_miles <= 0:
+        score -= 5
+        _add_reason(
+            "distance_clamped",
+            "Distance was clamped to 1 mi",
+            -5,
+            "Distance missing or non-positive; clamped for RPM",
+        )
+
+    score = max(0, min(100, int(round(score))))
+    bucket = "high" if score >= 80 else "medium" if score >= 50 else "low"
+    return TrustResponse(load_id=load.id, confidence_score=score, confidence_bucket=bucket, confidence_reasons=reasons)
 
 
 def _active_loads(ctx: AppContext) -> list[Load]:
@@ -677,6 +792,30 @@ def get_load(load_id: str, ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]
         if load.id == load_id:
             return load.model_dump(mode="json")
     raise HTTPException(status_code=404, detail="Load not found")
+
+
+@app.get("/api/loads/{load_id}/trust", response_model=TrustResponse)
+def get_load_trust(load_id: str, ctx: AppContext = Depends(get_ctx)) -> TrustResponse:
+    provenance: Provenance | None = None
+    load: Load | None = None
+
+    if ctx.ingestion_manager is not None:
+        stored = ctx.ingestion_manager._load_store.get(load_id)  # type: ignore[attr-defined]
+        if stored is not None:
+            load = stored.load
+            provenance = stored.provenance
+
+    if load is None:
+        for l in _active_loads(ctx):
+            if l.id == load_id:
+                load = l
+                break
+
+    if load is None:
+        raise HTTPException(status_code=404, detail="Load not found")
+
+    now = datetime.now(timezone.utc)
+    return _compute_trust(load, provenance, now)
 
 
 @app.get("/api/loads/{load_id}/routecast")

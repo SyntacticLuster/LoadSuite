@@ -302,3 +302,21 @@ class FilterPresetsResponse(BaseModel):
     user_id: str
     presets: List[FilterPresetModel]
     total: int
+
+
+# =============================================================================
+# Trust Models
+# =============================================================================
+
+class TrustReason(BaseModel):
+    factor: str
+    label: str
+    contribution: int
+    details: str = ""
+
+
+class TrustResponse(BaseModel):
+    load_id: str
+    confidence_score: int
+    confidence_bucket: str
+    confidence_reasons: List[TrustReason]
