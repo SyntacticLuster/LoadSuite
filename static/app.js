@@ -499,7 +499,7 @@ const renderWeatherSidebar = () => {
           "button",
           {
             class:
-              "rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+              "rounded-md border border-emerald-500 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/40",
             title: isCollapsed ? "Show" : "Hide",
             "aria-label": isCollapsed ? "Show" : "Hide",
             onclick: () => {
@@ -516,7 +516,7 @@ const renderWeatherSidebar = () => {
           "button",
           {
             class:
-              "rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+              "rounded-md border border-emerald-500 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/40",
             title: "Change ZIP code",
             "aria-label": "Change ZIP code",
             onclick: () => applyZipFromPrompt(),
@@ -1260,7 +1260,7 @@ const renderList = async (root) => {
       "select",
       {
         class:
-          "rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100",
+          "rounded-md border border-emerald-500 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
         onchange: async (e) => {
           state.query.sort = e.target.value;
           await render();
@@ -1823,7 +1823,14 @@ const renderFiltersPanel = () => {
     el("div", { class: "grid gap-2" }, [
       row(
         "Sort",
-        sel("sort", SORT_OPTIONS)
+        (() => {
+          const s = sel("sort", SORT_OPTIONS);
+          s.setAttribute(
+            "class",
+            "w-full rounded-md border border-emerald-500 bg-emerald-50 px-2 py-1 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+          );
+          return s;
+        })()
       ),
       row("Equipment", sel("equipment", [
         { value: "Dry Van", label: "Dry Van" },
