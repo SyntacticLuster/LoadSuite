@@ -1225,7 +1225,10 @@ const renderList = async (root) => {
       {
         class:
           "rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100",
-        onchange: (e) => (state.query.sort = e.target.value),
+        onchange: async (e) => {
+          state.query.sort = e.target.value;
+          await render();
+        },
       },
       SORT_OPTIONS.map((o) => el("option", { value: o.value }, [o.label]))
     );
@@ -1238,7 +1241,7 @@ const renderList = async (root) => {
       "div",
       { class: "flex flex-col gap-2 text-xs text-slate-600 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between" },
       [
-        el("div", {}, ["Results update on Search."]),
+        el("div", {}, ["Results update on Search and Sort."]),
         el("div", { class: "flex items-center gap-2 sm:flex-1 sm:justify-center" }, [
           el("div", { class: "font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" }, ["Sort:"]),
           sortSelect,
