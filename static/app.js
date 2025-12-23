@@ -759,7 +759,9 @@ const renderRouteCastWidget = (loadId, { compact } = { compact: false }) => {
   }
 
   if (state.routecast.error && state.routecast.loadId === id) {
-    wrap.appendChild(el("div", { class: "pt-2 text-xs text-red-600 dark:text-red-400" }, ["RouteCast unavailable."]));
+    wrap.appendChild(
+      el("div", { class: "pt-2 text-xs text-red-600 dark:text-red-400" }, ["Select a route to view RouteCast"])
+    );
     return wrap;
   }
 
