@@ -112,11 +112,13 @@ main() {
     git commit -m "$commit_msg"
   fi
 
-  git push -u "$remote" "$deploy_branch"
+  # Push using explicit repo URL to avoid relying on the configured remote protocol
+  # (some environments have origin set to https, which can fail on shared hosting / locked-down networks).
+  git push "$repo_url" "$deploy_branch:$deploy_branch"
 
   git checkout "$base_branch"
   git merge --ff-only "$deploy_branch"
-  git push "$remote" "$base_branch"
+  git push "$repo_url" "$base_branch:$base_branch"
 
   echo
   echo "Updating server checkout and restarting Passenger…"
