@@ -733,7 +733,7 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
         "button",
         {
           class:
-            "rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+            "rounded-md border border-emerald-500 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/40",
           title: isCollapsed ? "Show" : "Hide",
           "aria-label": isCollapsed ? "Show" : "Hide",
           onclick: () => {
@@ -1266,7 +1266,17 @@ const renderList = async (root) => {
           await render();
         },
       },
-      SORT_OPTIONS.map((o) => el("option", { value: o.value }, [o.label]))
+      SORT_OPTIONS.map((o) =>
+        el(
+          "option",
+          {
+            value: o.value,
+            class:
+              "bg-slate-200 text-emerald-800 dark:bg-slate-800 dark:text-emerald-300",
+          },
+          [o.label]
+        )
+      )
     );
     s.value = state.query.sort || "composite";
     return s;
@@ -1823,14 +1833,7 @@ const renderFiltersPanel = () => {
     el("div", { class: "grid gap-2" }, [
       row(
         "Sort",
-        (() => {
-          const s = sel("sort", SORT_OPTIONS);
-          s.setAttribute(
-            "class",
-            "w-full rounded-md border border-emerald-500 bg-emerald-50 px-2 py-1 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
-          );
-          return s;
-        })()
+        sel("sort", SORT_OPTIONS)
       ),
       row("Equipment", sel("equipment", [
         { value: "Dry Van", label: "Dry Van" },
