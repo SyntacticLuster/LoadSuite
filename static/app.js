@@ -367,6 +367,12 @@ const state = {
   watchlist: new Set(), // Set of watched load IDs
   filterPresets: [],    // Saved filter presets
 
+  watchlistSweep: {
+    loading: false,
+    error: "",
+    items: [], // [{ load_id, score, route }]
+  },
+
   lastSelectedLoadId: "",
 
   routecast: {
@@ -954,6 +960,61 @@ const toggleWatchlist = async (loadId) => {
   }
 };
 
+const runWatchlistSweep = async () => {
+  const ids = Array.from(state.watchlist || []).slice(0, 50);
+  state.watchlistSweep.loading = true;
+  state.watchlistSweep.error = "";
+  state.watchlistSweep.items = [];
+  render();
+
+  if (ids.length === 0) {
+    state.watchlistSweep.loading = false;
+    render();
+    return;
+  }
+
+  try {
+    const scoreResults = await Promise.allSettled(
+      ids.map(async (id) => {
+        const scored = await apiGet(`/api/loads/${id}/score`);
+        return { load_id: id, score: scored?.score };
+      })
+    );
+
+    const scored = scoreResults
+      .filter((r) => r.status === "fulfilled")
+      .map((r) => r.value)
+      .filter((x) => typeof x.score === "number" && Number.isFinite(x.score));
+
+    const top = scored.sort((a, b) => b.score - a.score).slice(0, 5);
+
+    const items = [];
+    for (const t of top) {
+      const existing = (state.latestLoads || []).find((l) => l.id === t.load_id) || null;
+      let route = t.load_id;
+      if (existing) {
+        route = `${existing.origin.city}, ${existing.origin.state} → ${existing.destination.city}, ${existing.destination.state}`;
+      } else {
+        try {
+          const load = await apiGet(`/api/loads/${t.load_id}`);
+          route = `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`;
+        } catch {
+          // Keep fallback route as the load ID.
+        }
+      }
+      items.push({ load_id: t.load_id, score: t.score, route });
+    }
+
+    state.watchlistSweep.items = items;
+  } catch (err) {
+    console.error("Watchlist sweep failed:", err);
+    state.watchlistSweep.error = err?.message || String(err);
+  } finally {
+    state.watchlistSweep.loading = false;
+    render();
+  }
+};
+
 const fetchFilterPresets = async () => {
   try {
     const res = await apiGet("/api/presets");
@@ -1454,9 +1515,9 @@ const renderList = async (root) => {
     const greenlightActive = hasActivePrefs();
     const greenlightOk = greenlightActive ? isGreenLight(load) : false;
 
-    // Color semantics: only GreenLight loads get the "good = green" treatment.
-    // For non-GreenLight loads, use teal so green remains a true endorsement.
-    const okTextClass = greenlightOk ? "text-green-600 dark:text-green-400" : "text-teal-600 dark:text-teal-400";
+    // Color semantics: reserve green for the GreenLight verdict.
+    // Use a more blue-leaning accent for informational/pass indicators.
+    const okTextClass = "text-sky-600 dark:text-sky-400";
 
     // Get score data if available
     const scoreData = state.scoredLoads[load.id];
@@ -1471,7 +1532,7 @@ const renderList = async (root) => {
 
     const rpmTone = (() => {
       if (rpmOk === false) return "text-red-600 dark:text-red-400";
-      if (rpmOk === true && greenlightOk) return "text-green-600 dark:text-green-400";
+      if (rpmOk === true) return okTextClass;
       return "text-slate-600 dark:text-slate-400";
     })();
     const rpmClass = `text-xs ${rpmTone}`;
@@ -1481,7 +1542,7 @@ const renderList = async (root) => {
     const payClass = greenlightOk ? "text-sm font-semibold text-green-600 dark:text-green-400" : "text-sm font-semibold";
     const routeClass = greenlightOk
       ? "text-sm font-semibold text-green-400 dark:text-green-300"
-      : "text-sm font-semibold";
+      : "text-sm font-semibold text-slate-900 dark:text-slate-100";
 
     // Build score + verdict badges (neutral pill; green tint only when endorsed)
     const scoreBadge = hasScore
@@ -1855,13 +1916,16 @@ const renderTerminalPanel = () => {
     for (const preset of state.filterPresets) {
       presetList.appendChild(
         el("div", { class: "flex items-center gap-1 rounded bg-slate-200 dark:bg-slate-700 px-2 py-1 text-xs" }, [
+          el("span", { class: "text-slate-700 dark:text-slate-200" }, [preset.name]),
           el(
             "button",
             {
-              class: "text-slate-700 dark:text-slate-200 hover:underline",
+              class:
+                "ml-1 rounded border border-emerald-500 bg-emerald-50 px-2 py-0.5 text-[0.7rem] font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+              title: "Apply preset and run Search",
               onclick: () => loadFilterPreset(preset),
             },
-            [preset.name]
+            ["Apply now"]
           ),
           el(
             "button",
@@ -1891,6 +1955,51 @@ const renderTerminalPanel = () => {
         : "No loads watched yet. Click ☆ on a load card to add.",
     ])
   );
+
+  watchlistSection.appendChild(
+    el(
+      "button",
+      {
+        class:
+          "w-full rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+        title: "Fetch scores for watched loads and show the top 5",
+        onclick: async () => {
+          await runWatchlistSweep();
+        },
+      },
+      ["Watchlist sweep"]
+    )
+  );
+
+  if (state.watchlistSweep?.loading) {
+    watchlistSection.appendChild(
+      el("div", { class: "text-xs text-slate-600 dark:text-slate-400" }, ["Sweeping…"])
+    );
+  } else if (state.watchlistSweep?.error) {
+    watchlistSection.appendChild(
+      el("div", { class: "text-xs text-red-600 dark:text-red-400" }, [state.watchlistSweep.error])
+    );
+  } else if ((state.watchlistSweep?.items || []).length > 0) {
+    watchlistSection.appendChild(
+      el("div", { class: "pt-1 text-xs font-semibold text-slate-700 dark:text-slate-300" }, ["Top 5 watched by score"])
+    );
+    const list = el("div", { class: "space-y-1" });
+    for (const item of state.watchlistSweep.items) {
+      list.appendChild(
+        el(
+          "a",
+          {
+            href: `${appBasePath}#/load/${item.load_id}`,
+            class:
+              "block rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+          },
+          [`${item.score.toFixed(0)} • ${item.route}`]
+        )
+      );
+    }
+    watchlistSection.appendChild(list);
+  }
+
   wrap.appendChild(watchlistSection);
 
   // Section: Alerts placeholder
