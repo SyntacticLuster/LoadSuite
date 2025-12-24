@@ -21,9 +21,9 @@ _NWS_HEADERS = {
 _NWS_ALERTS_TIMEOUT_S = 4.0
 
 
-# Approximate coordinates for the synthetic cities in app/data.py.
-# This keeps RouteCast deterministic for the demo dataset without introducing API keys.
-_CITY_COORDS: dict[tuple[str, str], tuple[float, float]] = {
+_CITY_COORDS_FALLBACK: dict[tuple[str, str], tuple[float, float]] = {
+    # Keep a small fallback map to avoid hard failures if the synthetic list changes
+    # or is unavailable for any reason.
     ("Atlanta", "GA"): (33.7490, -84.3880),
     ("Chicago", "IL"): (41.8781, -87.6298),
     ("Dallas", "TX"): (32.7767, -96.7970),
@@ -37,6 +37,43 @@ _CITY_COORDS: dict[tuple[str, str], tuple[float, float]] = {
     ("Salt Lake City", "UT"): (40.7608, -111.8910),
     ("Seattle", "WA"): (47.6062, -122.3321),
 }
+
+
+_CITY_COORDS_CACHE: dict[tuple[str, str], tuple[float, float]] | None = None
+
+
+def _city_coords() -> dict[tuple[str, str], tuple[float, float]]:
+    """Return city->(lat,lon) map used by RouteCast.
+
+    Primary source is the synthetic city list in `app.data._CITIES` so RouteCast
+    works for every synthetic load.
+    """
+
+    global _CITY_COORDS_CACHE
+    if _CITY_COORDS_CACHE is not None:
+        return _CITY_COORDS_CACHE
+
+    coords: dict[tuple[str, str], tuple[float, float]] = {}
+    try:
+        # Import lazily to avoid import-order surprises.
+        from .data import _CITIES  # type: ignore
+
+        for city, state, lat, lon in _CITIES:
+            key = (str(city).strip(), str(state).strip())
+            if key[0] and key[1]:
+                coords[key] = (float(lat), float(lon))
+    except Exception:
+        coords = {}
+
+    if not coords:
+        coords = dict(_CITY_COORDS_FALLBACK)
+    else:
+        # Ensure fallback coverage for legacy cities.
+        for k, v in _CITY_COORDS_FALLBACK.items():
+            coords.setdefault(k, v)
+
+    _CITY_COORDS_CACHE = coords
+    return coords
 
 
 def _get_json(url: str, *, headers: dict[str, str] | None = None, timeout_s: float = 8.0) -> Any:
@@ -130,9 +167,9 @@ def geocode_city_state(city: str, state: str) -> dict[str, Any]:
     key = (str(city or "").strip(), str(state or "").strip())
     if not key[0] or not key[1]:
         raise ValueError("city/state required")
-    coords = _CITY_COORDS.get(key)
+    coords = _city_coords().get(key)
     if not coords:
-        raise LookupError("city/state not supported")
+        raise LookupError(f"city/state not supported: {key[0]}, {key[1]}")
     return {"city": key[0], "state": key[1], "lat": coords[0], "lon": coords[1]}
 
 
