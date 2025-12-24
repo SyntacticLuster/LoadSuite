@@ -5,6 +5,7 @@ import json
 import random
 import math
 import uuid
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -190,30 +191,112 @@ def _route_distance_miles(origin: tuple[str, str, float, float], dest: tuple[str
     return base * factor
 
 
-def generate_synthetic_loads(count: int) -> Dataset:
+@dataclass
+class BrokerProfile:
+    base_rating: float
+    rating_display: float
+    has_lane_history: bool
+    detention_risk_flag: bool
+
+
+# Broker profiles keyed by seed (int or None) then broker name. Profiles are
+# intended to be stable per-broker within a process and deterministic when a
+# seed is provided.
+_BROKER_PROFILES: dict[int | None, dict[str, BrokerProfile]] = {}
+
+
+def _lerp(a: float, b: float, t: float) -> float:
+    return a + (b - a) * t
+
+
+def _clamp(v: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, v))
+
+
+def _deterministic_hash_bytes(seed_key: int | None, name: str) -> bytes:
+    key = f"{seed_key}:{name}".encode("utf-8")
+    return hashlib.sha256(key).digest()
+
+
+def _get_or_create_broker_profile(name: str, rng: random.Random, seed_key: int | None = None) -> BrokerProfile:
+    profiles = _BROKER_PROFILES.setdefault(seed_key, {})
+    if name in profiles:
+        return profiles[name]
+
+    # base_rating: 2.5 - 5.0, one decimal
+    base_rating = round(rng.uniform(2.5, 5.0), 1)
+
+    # Stable per-broker noise in {-0.1, 0.0, +0.1}
+    if seed_key is not None:
+        h = _deterministic_hash_bytes(seed_key, name)
+        noise_idx = int.from_bytes(h[0:4], "big") % 3
+        noise = (-0.1, 0.0, 0.1)[noise_idx]
+    else:
+        noise = (-0.1, 0.0, 0.1)[int(rng.random() * 3) % 3]
+
+    rating_display = round(_clamp(base_rating + noise, 1.0, 5.0), 1)
+
+    # Probabilities shaped by rating_display
+    t = (rating_display - 1.0) / 4.0
+    lane_p = _clamp(_lerp(0.10, 0.85, t), 0.0, 1.0)
+    detention_p = _clamp(_lerp(0.60, 0.05, t), 0.0, 1.0)
+
+    # Determine booleans deterministically when seed provided
+    if seed_key is not None:
+        h = _deterministic_hash_bytes(seed_key, name)
+        lane_rand = int.from_bytes(h[4:8], "big") / 2**32
+        det_rand = int.from_bytes(h[8:12], "big") / 2**32
+        has_lane_history = lane_rand < lane_p
+        detention_risk_flag = det_rand < detention_p
+    else:
+        has_lane_history = rng.random() < lane_p
+        detention_risk_flag = rng.random() < detention_p
+
+    profile = BrokerProfile(
+        base_rating=base_rating,
+        rating_display=rating_display,
+        has_lane_history=has_lane_history,
+        detention_risk_flag=detention_risk_flag,
+    )
+    profiles[name] = profile
+    return profile
+
+
+def generate_synthetic_loads(count: int, rng: random.Random | None = None, seed: int | None = None) -> Dataset:
+    """Generate `count` synthetic loads using the provided RNG.
+
+    If `rng` is None, uses the module-level `random` for compatibility.
+    If `seed` is provided, broker profiles and any seeded behavior will be stored
+    under that seed key so cached datasets with the same seed are consistent.
+    """
+    rng = rng or random
     now = _now_utc()
     loads: list[Load] = []
     for _ in range(count):
         origin_city = _rand_city()
         dest_city = _rand_city(excluding=(origin_city[0], origin_city[1]))
 
-        pickup_start = now + timedelta(hours=random.randint(1, 72))
-        pickup_end = pickup_start + timedelta(hours=random.randint(2, 10))
-        transit_hours = random.randint(8, 60)
+        pickup_start = now + timedelta(hours=rng.randint(1, 72))
+        pickup_end = pickup_start + timedelta(hours=rng.randint(2, 10))
+        transit_hours = rng.randint(8, 60)
         delivery_start = pickup_end + timedelta(hours=transit_hours)
-        delivery_end = delivery_start + timedelta(hours=random.randint(2, 10))
+        delivery_end = delivery_start + timedelta(hours=rng.randint(2, 10))
 
         distance = round(_route_distance_miles(origin_city, dest_city), 1)
-        deadhead = round(distance * random.uniform(0.0, 0.12), 1)
-        equipment = random.choice(_EQUIPMENT)
-        weight = random.randint(5000, 46000)
-        hazmat = random.random() < 0.08
-        detention = random.random() < 0.35
-        multi_stop = random.random() < 0.12
-        lane_history = random.random() < 0.25
-        commodity = random.choice(_COMMODITIES)
+        deadhead = round(distance * rng.uniform(0.0, 0.12), 1)
+        equipment = rng.choice(_EQUIPMENT)
+        weight = rng.randint(5000, 46000)
+        hazmat = rng.random() < 0.08
+        multi_stop = rng.random() < 0.12
 
-        base_rpm = random.uniform(1.6, 3.4)
+        # Broker profiles provide per-broker consistent ratings and flags.
+        broker_name = rng.choice(_BROKERS)
+        profile = _get_or_create_broker_profile(broker_name, rng, seed_key=seed)
+        detention = profile.detention_risk_flag
+        lane_history = profile.has_lane_history
+        commodity = rng.choice(_COMMODITIES)
+
+        base_rpm = rng.uniform(1.6, 3.4)
         if equipment == "Reefer":
             base_rpm += 0.2
         if hazmat:
@@ -226,13 +309,16 @@ def generate_synthetic_loads(count: int) -> Dataset:
         rate_total = round(base_rpm * distance, 2)
         rpm = round(rate_total / max(distance, 1.0), 3)
 
-        broker = Broker(name=random.choice(_BROKERS), rating=round(random.uniform(2.5, 5.0), 1))
-        posted_at = now - timedelta(hours=random.randint(1, 48))
-        updated_at = now - timedelta(minutes=random.randint(0, 180))
+        # Use rating_display for API-facing rating (includes stable noise)
+        broker = Broker(name=broker_name, rating=profile.rating_display)
+        posted_at = now - timedelta(hours=rng.randint(1, 48))
+        updated_at = now - timedelta(minutes=rng.randint(0, 180))
 
+        # Use RNG-derived UUID so seeds produce deterministic IDs across restarts
+        id_val = str(uuid.UUID(int=rng.getrandbits(128)))
         loads.append(
             Load(
-                id=str(uuid.uuid4()),
+                id=id_val,
                 origin=Location(city=origin_city[0], state=origin_city[1]),
                 destination=Location(city=dest_city[0], state=dest_city[1]),
                 pickup_start=pickup_start,
@@ -256,6 +342,30 @@ def generate_synthetic_loads(count: int) -> Dataset:
             )
         )
     return Dataset(loads=loads, source="synthetic")
+
+
+# In-process process-local cache for synthetic datasets keyed by (count, seed).
+# Note: This cache is per-Python process (multi-worker deployments will have
+# one cache per worker process).
+_SYNTH_CACHE: dict[tuple[int, int | None], Dataset] = {}
+
+
+def get_synthetic_dataset(count: int, seed: int | None = None) -> Dataset:
+    key = (int(count), int(seed) if seed is not None else None)
+    if key in _SYNTH_CACHE:
+        return _SYNTH_CACHE[key]
+
+    rng = random.Random(seed) if seed is not None else random.Random()
+    # If a seed is provided, clear any existing broker profiles for that seed so
+    # generation consumes RNG in a consistent order and remains reproducible
+    # across separate runs (pre-populated profiles would otherwise change RNG
+    # consumption and break determinism).
+    if seed is not None:
+        _BROKER_PROFILES[int(seed)] = {}
+
+    ds = generate_synthetic_loads(count, rng=rng, seed=int(seed) if seed is not None else None)
+    _SYNTH_CACHE[key] = ds
+    return ds
 
 
 def _parse_bool(value: str | None) -> bool | None:

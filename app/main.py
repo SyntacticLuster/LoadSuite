@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from .app_context import AppContext
 from .auth import require_admin_api_key
 from .config import settings
-from .data import Dataset, generate_synthetic_loads, loads_from_csv_bytes, write_sample_files
+from .data import Dataset, get_synthetic_dataset, loads_from_csv_bytes, write_sample_files
 from .deps import get_ctx, get_ingestion, get_routecast_client, get_scoring
 from .filters import apply_filters, apply_sort
 from .ingestion.manager import IngestionManager
@@ -122,8 +123,18 @@ def _build_default_ctx() -> AppContext:
         alert_rules_store = AlertRulesStore()
         filter_presets_store = FilterPresetsStore()
 
+    # Support deterministic synthetic datasets via SYNTHETIC_SEED env var.
+    # Cache is process-local; multi-worker deployments will have one cache per worker.
+    seed_val = None
+    seed_raw = os.environ.get("SYNTHETIC_SEED")
+    if seed_raw is not None:
+        try:
+            seed_val = int(seed_raw)
+        except Exception:
+            seed_val = None
+
     return AppContext(
-        dataset=generate_synthetic_loads(settings.synthetic_load_count),
+        dataset=get_synthetic_dataset(settings.synthetic_load_count, seed=seed_val),
         scoring_engine=ScoringEngine(),
         scoring_service=None,
         routecast_client=None,
@@ -907,7 +918,32 @@ def get_routecast(load_id: str, ctx: AppContext = Depends(get_ctx)) -> dict[str,
 
 @app.post("/api/refresh")
 def refresh(ctx: AppContext = Depends(get_ctx), req: RefreshRequest = RefreshRequest()) -> dict[str, Any]:
-    ctx.dataset = generate_synthetic_loads(req.count)
+    """Refresh synthetic dataset on-demand.
+
+    If SYNTHETIC_SEED is set, the seeded dataset is used (deterministic).
+    Otherwise a fresh RNG is used and the cache entry for (count, None) is replaced
+    so repeated refreshes produce new random datasets.
+    """
+    seed_raw = os.environ.get("SYNTHETIC_SEED")
+    seed_val = None
+    if seed_raw is not None:
+        try:
+            seed_val = int(seed_raw)
+        except Exception:
+            seed_val = None
+
+    if seed_val is None:
+        # Force generate a fresh, non-deterministic dataset and update cache.
+        from .data import _SYNTH_CACHE, generate_synthetic_loads
+
+        ds = generate_synthetic_loads(req.count, rng=random.Random())
+        _SYNTH_CACHE[(int(req.count), None)] = ds
+    else:
+        from .data import get_synthetic_dataset
+
+        ds = get_synthetic_dataset(req.count, seed=seed_val)
+
+    ctx.dataset = ds
     return {"ok": True, "source": ctx.dataset.source, "count": len(ctx.dataset.loads)}
 
 
