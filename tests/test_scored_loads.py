@@ -68,6 +68,21 @@ class TestScoredLoadsEndpoint:
         for item in data["loads"]:
             assert item["load"]["equipment"] == "Dry Van"
 
+    def test_scored_loads_multi_term_search(self):
+        """Multi-term queries should match at least one sampled load."""
+        loads_response = client.get("/api/loads")
+        assert loads_response.status_code == 200
+        loads = loads_response.json()["loads"]
+        assert loads, "Expected static dataset to contain loads"
+
+        sample = loads[0]
+        query_components = f"{sample['origin']['city']} {sample['destination']['city']}"
+
+        response = client.get("/api/loads/scored", params={"q": query_components, "limit": 5})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["loads"], "Expected static dataset to return loads for queried origin/destination tokens"
+
     def test_scored_loads_greenlight_respects_preferences(self):
         """GreenLight should only apply when user criteria are met."""
         user_id = "test-greenlight-criteria"

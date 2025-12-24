@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable, List, Optional
+import re
 
 from .models import Load, LoadsQuery
 
@@ -11,20 +12,32 @@ def _contains(haystack: str, needle: str) -> bool:
     return needle.lower() in haystack.lower()
 
 
+_SEARCH_TOKEN_RE = re.compile(r"[,\s→\-]+")
+
+
+def _normalize_query_tokens(raw_query: str) -> list[str]:
+    trimmed = str(raw_query or "").strip().lower()
+    if not trimmed:
+        return []
+    return [token for token in _SEARCH_TOKEN_RE.split(trimmed) if token]
+
+
 def apply_filters(loads: Iterable[Load], query: LoadsQuery) -> list[Load]:
     result: list[Load] = []
+    query_tokens = _normalize_query_tokens(query.q or "")
     for load in loads:
-        if query.q:
-            q = query.q.strip()
-            if q:
-                if not (
-                    _contains(load.origin.city, q)
-                    or _contains(load.origin.state, q)
-                    or _contains(load.destination.city, q)
-                    or _contains(load.destination.state, q)
-                    or _contains(load.commodity, q)
-                ):
-                    continue
+        if query_tokens:
+            haystack = " ".join(
+                [
+                    load.origin.city,
+                    load.origin.state,
+                    load.destination.city,
+                    load.destination.state,
+                    load.commodity,
+                ]
+            ).lower()
+            if not all(token in haystack for token in query_tokens):
+                continue
 
         if query.equipment and load.equipment != query.equipment:
             continue

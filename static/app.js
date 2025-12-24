@@ -435,6 +435,10 @@ const state = {
   lastSelectedLoadId: "",
   listPage: 0,
   listTotal: 0,
+  searchLoading: false,
+  searchRequestId: 0,
+  activeSearchRequestId: 0,
+  hasLoadedResults: false,
 
   routecast: {
     loadId: "",
@@ -1606,6 +1610,225 @@ const renderPaginationRow = (total) => {
   );
 };
 
+const formatLoadCount = (count) => `${count} load${count === 1 ? "" : "s"}`;
+
+const getSortedDisplayLoads = (availableLoads) => {
+  const loads = availableLoads.slice(0, 200);
+  if (state.prefs.greenlight_sort === "on") {
+    return [...loads].sort((a, b) => {
+      const ag = isGreenLight(a) ? 1 : 0;
+      const bg = isGreenLight(b) ? 1 : 0;
+      return bg - ag;
+    });
+  }
+  return loads;
+};
+
+const renderLoadGrid = (loads) => {
+  const grid = el("div", { class: "grid grid-cols-1 gap-2 pt-2 lg:grid-cols-2" });
+  for (const load of loads) {
+    const { rpmOk, equipmentOk, weightOk, detentionOk } = prefStatus(load);
+    const greenlightActive = hasActivePrefs();
+    const scoreData = state.scoredLoads[load.id];
+    const hasScore = !!scoreData;
+    const greenlightOk = greenlightActive && isGreenLight(load);
+
+    const okTextClass = "text-sky-600 dark:text-sky-400";
+    const maybeClass = (ok, defaultClass) => {
+      if (ok === null) return defaultClass;
+      return ok ? okTextClass : "text-red-600 dark:text-red-400";
+    };
+    const rpmClass = "text-xs text-slate-700 dark:text-slate-300";
+    const equipClass = maybeClass(equipmentOk, "");
+    const weightClass = maybeClass(weightOk, "");
+    const detentionClass = maybeClass(detentionOk, "");
+    const payClass = "text-sm font-semibold text-slate-700 dark:text-slate-300";
+    const routeClass = "text-sm font-semibold text-slate-900 dark:text-slate-100";
+
+    const scoreValue = hasScore ? scoreData.score : null;
+    const scoreBadge = hasScore
+      ? el(
+          "span",
+          {
+            class: `inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
+              greenlightOk
+                ? "border-emerald-400 bg-emerald-50/80 text-slate-900 shadow-[0_0_0_1px_rgba(16,185,129,0.45)] dark:border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-50"
+                : "border-slate-300 bg-slate-100 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            }`,
+            title: buildScoreTooltip(scoreValue, greenlightOk, load),
+          },
+          [`${scoreValue.toFixed(1)}`]
+        )
+      : null;
+
+    const scoreCluster = hasScore
+      ? (() => {
+          const glyph = greenlightOk
+            ? el(
+                "span",
+                { class: "mr-1 inline-flex items-center" },
+                [
+                  el("img", {
+                    src: toAppUrl("/static/images/gl_glyph.png"),
+                    alt: "GreenLight",
+                    class: "inline-block align-middle h-4 w-4 transform scale-150",
+                  }),
+                ]
+              )
+            : null;
+
+          const verdictBadge = greenlightOk
+            ? null
+            : el(
+                "span",
+                {
+                  class:
+                    "mr-1 inline-flex items-center rounded-full px-2 py-0.5 text-[0.7rem] font-semibold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100",
+                  title: "Scored (not GreenLight)",
+                },
+                ["Scored"]
+              );
+
+          return el("div", { class: "flex items-center" }, [
+            glyph,
+            verdictBadge,
+            scoreBadge,
+          ].filter(Boolean));
+        })()
+      : null;
+
+    const topReasons = hasScore && scoreData.top_reasons.length > 0
+      ? (() => {
+          const reasons = scoreData.top_reasons.slice(0, 2);
+          const children = [];
+          reasons.forEach((reason, idx) => {
+            const icon = reason.direction === "positive" ? "✓" : reason.direction === "negative" ? "✗" : "○";
+            const colorClass =
+              reason.direction === "positive"
+                ? okTextClass
+                : reason.direction === "negative"
+                ? "text-red-600 dark:text-red-400"
+                : "text-slate-500 dark:text-slate-400";
+
+            children.push(el("span", { class: colorClass }, [`${icon} ${reason.display_name}`]));
+            if (idx < reasons.length - 1) {
+              children.push(el("span", { class: "px-1 text-slate-400 dark:text-slate-500" }, ["•"]));
+            }
+          });
+          return el("div", { class: "text-xs truncate" }, children);
+        })()
+      : null;
+
+    const isWatched = state.watchlist.has(load.id);
+    const watchlistBtn = el(
+      "button",
+      {
+        class: watchlistListBtnClass(isWatched),
+        title: isWatched ? "Remove from watchlist" : "Add to watchlist",
+        "data-watchlist-id": load.id,
+        "data-watchlist-variant": "list",
+        onclick: (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleWatchlist(load.id);
+        },
+      },
+      [isWatched ? "★" : "☆"]
+    );
+
+    const row = el(
+      "a",
+      {
+        href: `${appBasePath}#/load/${load.id}`,
+        onclick: () => setLastSelectedLoadId(load.id),
+        class:
+          [
+            "block rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 relative",
+            "min-h-[130px]",
+            state.uiPrefs.greenlight_full_row && greenlightOk ? "lg:col-span-2" : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+      },
+      [
+        el("div", { class: "flex items-start justify-between gap-2" }, [
+          el("div", { class: "min-w-0 flex-1" }, [
+            el("div", { class: "flex items-center gap-2" }, [
+              el("div", { class: routeClass }, [
+                `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
+              ]),
+            ]),
+            topReasons ? el("div", { class: "pt-1" }, [topReasons]) : null,
+            el("div", { class: "mt-2" }, [
+              el("div", { class: "text-xs text-slate-700 dark:text-slate-300" }, [
+                el("span", { class: equipClass }, [load.equipment]),
+                " • ",
+                `${fmtNum(load.distance_miles)} mi • deadhead ${fmtNum(load.deadhead_miles)} mi • `,
+                el("span", { class: weightClass }, [`${load.weight_lbs} lbs`]),
+              ]),
+              el(
+                "div",
+                { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" },
+                [
+                  el("div", { class: "min-w-0" }, [
+                    `Broker: ${load.broker.name} (${fmtNum(load.broker.rating, 1)})`,
+                    load.hazmat ? " • Hazmat" : "",
+                    load.detention ? " • " : "",
+                    load.detention ? el("span", { class: detentionClass }, ["Detention"]) : "",
+                    load.multi_stop ? " • Multi-stop" : "",
+                    load.lane_history ? " • Lane history" : "",
+                  ]),
+                ]
+              ),
+            ]),
+          ].filter(Boolean)),
+
+          el("div", { class: "flex flex-col items-end justify-between self-stretch text-right" }, [
+            el("div", { class: "flex flex-col items-end gap-1" }, [
+              scoreCluster,
+              el("div", {}, [
+                el("div", { class: payClass }, [fmtMoney(load.rate_total_usd)]),
+                el("div", { class: rpmClass }, [`$${fmtNum(load.rpm, 2)}/mi`]),
+              ]),
+            ].filter(Boolean)),
+          ]),
+        ]),
+        el(
+          "div",
+          { class: "absolute bottom-3 right-3" },
+          [watchlistBtn]
+        ),
+      ]
+    );
+    grid.appendChild(row);
+  }
+  return grid;
+};
+
+const renderResultsInto = (container, loads, opts = {}) => {
+  const { isLoading = false, hasLoadedResults = state.hasLoadedResults, error = null } = opts;
+  container.innerHTML = "";
+  if (!loads.length) {
+    const message = error
+      ? "Could not load search results. Try again."
+      : isLoading || !hasLoadedResults
+      ? "Loading loads…"
+      : "No matches. Try city/state, lane, or commodity.";
+    container.appendChild(
+      el(
+        "div",
+        {
+          class:
+            "rounded-lg border border-slate-200 bg-white/80 p-8 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300",
+        },
+        [message]
+      )
+    );
+    return;
+  }
+  container.appendChild(renderLoadGrid(loads));
+};
+
 const persistRailWidth = (side, width) => {
   const clamped = clampRailWidth(side, width);
   if (side === "left") state.uiPrefs.left_rail_width = clamped;
@@ -1852,6 +2075,9 @@ const beginRailResize = (side) => (event) => {
 };
 
 const renderList = async (root) => {
+  const requestId = ++state.searchRequestId;
+  state.activeSearchRequestId = requestId;
+  state.searchLoading = true;
   const layout = el("div", { id: "terminal-layout", class: "grid gap-4 items-start" });
   const railBackdrop = el("div", {
     id: "terminal-rail-backdrop",
@@ -2078,25 +2304,44 @@ const renderList = async (root) => {
     settingsSlot.appendChild(settingsWrap);
   }
 
+  const getTrimmedQuery = () => String(state.query.q || "").trim();
+  const handleSearchSubmit = () => {
+    if (state.searchLoading) return;
+    const trimmed = getTrimmedQuery();
+    if (!trimmed) return;
+    state.listPage = 0;
+    render();
+  };
+
   const searchRow = el("div", { class: "flex gap-2" }, [
     el("input", {
       class:
         "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-800 dark:bg-slate-900",
-      placeholder: "Search origin/destination/commodity",
+      placeholder: "Try Miami, Miami, FL, Miami → Orlando, commodity",
       value: state.query.q,
       oninput: (e) => {
-        state.query.q = e.target.value;
+        const next = e.target.value;
+        state.query.q = next;
+        if (!String(next).trim() && !state.searchLoading) {
+          state.listPage = 0;
+          render();
+        }
+      },
+      onkeydown: (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleSearchSubmit();
+        }
       },
     }),
     el(
       "button",
       {
+        type: "button",
         class:
           "shrink-0 rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
-        onclick: () => {
-          state.listPage = 0;
-          render();
-        },
+        disabled: state.searchLoading || !getTrimmedQuery(),
+        onclick: handleSearchSubmit,
       },
       ["Search"]
     ),
@@ -2191,12 +2436,40 @@ const renderList = async (root) => {
     return s;
   })();
 
+  const statusSpinner = el("span", {
+    class: "h-2 w-2 rounded-full bg-slate-600 dark:bg-slate-300 transition",
+    style: "visibility: hidden;",
+  });
+  const statusText = el("span", { class: "text-xs font-semibold text-slate-700 dark:text-slate-300" }, [
+    "Results update on Search and Sort.",
+  ]);
+  const statusMeta = el("span", { class: "text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" }, [
+    "",
+  ]);
+  const statusRow = el("div", { class: "flex items-center gap-2" }, [statusSpinner, statusText, statusMeta]);
+
+  const setStatusLoading = () => {
+    statusSpinner.style.visibility = "visible";
+    statusText.textContent = "Searching loads…";
+    statusMeta.textContent = state.listTotal ? formatLoadCount(state.listTotal) : "";
+  };
+  const setStatusIdle = (total) => {
+    statusSpinner.style.visibility = "hidden";
+    statusText.textContent = "Results update on Search and Sort.";
+    statusMeta.textContent = total > 0 ? formatLoadCount(total) : "No matches";
+  };
+  const setStatusError = (message) => {
+    statusSpinner.style.visibility = "hidden";
+    statusText.textContent = message;
+    statusMeta.textContent = "";
+  };
+
   const listWrap = el("div", { class: "pt-2" }, [
     el(
       "div",
       { class: "flex flex-col gap-2 text-xs text-slate-600 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between" },
       [
-        el("div", {}, ["Results update on Search and Sort."]),
+        statusRow,
         el("div", { class: "flex items-center gap-2 sm:flex-1 sm:justify-center" }, [
           el("div", { class: "font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" }, ["Sort:"]),
           sortSelect,
@@ -2205,6 +2478,8 @@ const renderList = async (root) => {
       ]
     ),
   ]);
+  const resultsContainer = el("div", { class: "pt-2" });
+  listWrap.appendChild(resultsContainer);
   top.appendChild(listWrap);
   mainInner.appendChild(top);
   main.appendChild(mainInner);
@@ -2215,6 +2490,13 @@ const renderList = async (root) => {
   root.appendChild(railBackdrop);
   applyTerminalLayout();
 
+  const cachedLoads = getSortedDisplayLoads(state.latestLoads || []);
+  renderResultsInto(resultsContainer, cachedLoads, {
+    isLoading: true,
+    hasLoadedResults: state.hasLoadedResults,
+  });
+  setStatusLoading();
+
   await fetchWatchlist();
   await fetchFilterPresets();
 
@@ -2223,17 +2505,39 @@ const renderList = async (root) => {
   const querySuffix = qs
     ? `${qs}&limit=${LIST_PAGE_SIZE}&offset=${offset}`
     : `?limit=${LIST_PAGE_SIZE}&offset=${offset}`;
-  const data = await apiGet(`/api/loads/scored${querySuffix}`);
+
+  let data = null;
+  let fetchError = null;
+  try {
+    data = await apiGet(`/api/loads/scored${querySuffix}`);
+  } catch (err) {
+    fetchError = err;
+  } finally {
+    if (state.activeSearchRequestId === requestId) {
+      state.searchLoading = false;
+    }
+  }
+
+  if (state.activeSearchRequestId !== requestId) return;
+
+  if (fetchError) {
+    console.error("Failed to fetch loads:", fetchError);
+    renderResultsInto(resultsContainer, [], { error: fetchError, hasLoadedResults: state.hasLoadedResults });
+    setStatusError("Search failed.");
+    return;
+  }
+
   const totalPages = Math.max(1, Math.ceil(data.total / LIST_PAGE_SIZE));
   if (state.listPage >= totalPages) {
     state.listPage = Math.max(0, totalPages - 1);
     state.listTotal = data.total;
     return render();
   }
-  state.listTotal = data.total;
-  listWrap.appendChild(renderPaginationRow(data.total));
 
-  const ul = el("div", { class: "grid grid-cols-1 gap-2 pt-2 lg:grid-cols-2" });
+  state.listTotal = data.total;
+  const paginationRow = renderPaginationRow(data.total);
+  listWrap.insertBefore(paginationRow, resultsContainer);
+
   const scoredItems = Array.isArray(data.loads) ? data.loads : [];
   state.scoredLoads = {};
   for (const item of scoredItems) {
@@ -2248,206 +2552,10 @@ const renderList = async (root) => {
   const availableLoads = scoredItems.map((item) => item.load).filter(Boolean);
   state.latestLoads = availableLoads;
   _updateGreenlightTicker(state.latestLoads);
-  const loads = availableLoads.slice(0, 200);
-  const sortedLoads = state.prefs.greenlight_sort === "on"
-    ? [...loads].sort((a, b) => {
-        const ag = isGreenLight(a) ? 1 : 0;
-        const bg = isGreenLight(b) ? 1 : 0;
-        return bg - ag;
-      })
-    : loads;
-
-  for (const load of sortedLoads) {
-    const { rpmOk, equipmentOk, weightOk, detentionOk } = prefStatus(load);
-    const greenlightActive = hasActivePrefs();
-
-    // Get score data if available
-    const scoreData = state.scoredLoads[load.id];
-    const hasScore = !!scoreData;
-    const greenlightOk = greenlightActive && isGreenLight(load);
-
-    // Color semantics: reserve green for the GreenLight verdict.
-    // Use a more blue-leaning accent for informational/pass indicators.
-    const okTextClass = "text-sky-600 dark:text-sky-400";
-    const scoreValue = hasScore ? scoreData.score : null;
-    const isWatched = state.watchlist.has(load.id);
-
-    const maybeClass = (ok, defaultClass) => {
-      if (ok === null) return defaultClass;
-      return ok ? okTextClass : "text-red-600 dark:text-red-400";
-    };
-
-    const rpmClass = "text-xs text-slate-700 dark:text-slate-300";
-    const equipClass = maybeClass(equipmentOk, "");
-    const weightClass = maybeClass(weightOk, "");
-    const detentionClass = maybeClass(detentionOk, "");
-    const payClass = "text-sm font-semibold text-slate-700 dark:text-slate-300";
-    const routeClass = "text-sm font-semibold text-slate-900 dark:text-slate-100";
-
-    // Build score + verdict badges (neutral pill; green tint only when endorsed)
-    const scoreBadge = hasScore
-      ? el(
-          "span",
-          {
-            class: `inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
-              greenlightOk
-                ? "border-emerald-400 bg-emerald-50/80 text-slate-900 shadow-[0_0_0_1px_rgba(16,185,129,0.45)] dark:border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-50"
-                : "border-slate-300 bg-slate-100 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            }`,
-            title: buildScoreTooltip(scoreValue, greenlightOk, load),
-          },
-          [`${scoreValue.toFixed(1)}`]
-        )
-      : null;
-
-    const scoreCluster = hasScore
-      ? (() => {
-          const glyph = greenlightOk
-            ? el(
-                "span",
-                { class: "mr-1 inline-flex items-center" },
-                [
-                  el("img", {
-                    src: toAppUrl("/static/images/gl_glyph.png"),
-                    alt: "GreenLight",
-                    class: "inline-block align-middle h-4 w-4 transform scale-150",
-                  }),
-                ]
-              )
-            : null;
-
-          const verdictBadge = greenlightOk
-            ? null
-            : el(
-                "span",
-                {
-                  class:
-                    "mr-1 inline-flex items-center rounded-full px-2 py-0.5 text-[0.7rem] font-semibold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100",
-                  title: "Scored (not GreenLight)",
-                },
-                ["Scored"]
-              );
-
-          return el("div", { class: "flex items-center" }, [
-            glyph,
-            verdictBadge,
-            scoreBadge,
-          ].filter(Boolean));
-        })()
-      : null;
-
-    // Build top reasons (inline, expandable)
-    const topReasons = hasScore && scoreData.top_reasons.length > 0
-      ? (() => {
-          const reasons = scoreData.top_reasons.slice(0, 2);
-          const children = [];
-          reasons.forEach((r, idx) => {
-            const icon = r.direction === "positive" ? "✓" : r.direction === "negative" ? "✗" : "○";
-            const colorClass =
-              r.direction === "positive"
-                ? okTextClass
-                : r.direction === "negative"
-                ? "text-red-600 dark:text-red-400"
-                : "text-slate-500 dark:text-slate-400";
-
-            children.push(el("span", { class: colorClass }, [`${icon} ${r.display_name}`]));
-            if (idx < reasons.length - 1) {
-              children.push(el("span", { class: "px-1 text-slate-400 dark:text-slate-500" }, ["•"]));
-            }
-          });
-          return el("div", { class: "text-xs truncate" }, children);
-        })()
-      : null;
-
-    // Watchlist toggle button
-    const watchlistBtn = el(
-      "button",
-      {
-        class: watchlistListBtnClass(isWatched),
-        title: isWatched ? "Remove from watchlist" : "Add to watchlist",
-        "data-watchlist-id": load.id,
-        "data-watchlist-variant": "list",
-        onclick: (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          toggleWatchlist(load.id);
-        },
-      },
-      [isWatched ? "★" : "☆"]
-    );
-
-    const row = el(
-      "a",
-      {
-        href: `${appBasePath}#/load/${load.id}`,
-        onclick: () => setLastSelectedLoadId(load.id),
-        class:
-          [
-            "block rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 relative",
-            "min-h-[130px]",
-            state.uiPrefs.greenlight_full_row && greenlightOk ? "lg:col-span-2" : "",
-          ]
-            .filter(Boolean)
-            .join(" "),
-      },
-      [
-        // Header: left = route, right = vertical stack (score + price + $/mi) + watch star
-        el("div", { class: "flex items-start justify-between gap-2" }, [
-          // Left: route + load info stack
-          el("div", { class: "min-w-0 flex-1" }, [
-            el("div", { class: "flex items-center gap-2" }, [
-              el("div", { class: routeClass }, [
-                `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
-              ]),
-            ]),
-            topReasons ? el("div", { class: "pt-1" }, [topReasons]) : null,
-            el("div", { class: "mt-2" }, [
-              el("div", { class: "text-xs text-slate-700 dark:text-slate-300" }, [
-                el("span", { class: equipClass }, [load.equipment]),
-                " • ",
-                `${fmtNum(load.distance_miles)} mi • deadhead ${fmtNum(load.deadhead_miles)} mi • `,
-                el("span", { class: weightClass }, [`${load.weight_lbs} lbs`]),
-              ]),
-              el(
-                "div",
-                { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" },
-                [
-                  el("div", { class: "min-w-0" }, [
-                    `Broker: ${load.broker.name} (${fmtNum(load.broker.rating, 1)})`,
-                    load.hazmat ? " • Hazmat" : "",
-                    load.detention ? " • " : "",
-                    load.detention ? el("span", { class: detentionClass }, ["Detention"]) : "",
-                    load.multi_stop ? " • Multi-stop" : "",
-                    load.lane_history ? " • Lane history" : "",
-                  ]),
-                ]
-              ),
-            ]),
-          ].filter(Boolean)),
-
-          // Right: score/price at top, watchlist star anchored bottom-right
-          el("div", { class: "flex flex-col items-end justify-between self-stretch text-right" }, [
-            el("div", { class: "flex flex-col items-end gap-1" }, [
-              // Score cluster (if present) will appear at the top of this stack
-              scoreCluster,
-              // Price (preserve existing styling)
-              el("div", {}, [
-                el("div", { class: payClass }, [fmtMoney(load.rate_total_usd)]),
-                el("div", { class: rpmClass }, [`$${fmtNum(load.rpm, 2)}/mi`]),
-              ]),
-            ].filter(Boolean)),
-          ]),
-        ]),
-        el(
-          "div",
-          { class: "absolute bottom-3 right-3" },
-          [watchlistBtn]
-        ),
-      ]
-    );
-    ul.appendChild(row);
-  }
-  listWrap.appendChild(ul);
+  const sortedLoads = getSortedDisplayLoads(availableLoads);
+  state.hasLoadedResults = true;
+  renderResultsInto(resultsContainer, sortedLoads, { hasLoadedResults: true });
+  setStatusIdle(data.total);
 };
 
 const renderPrefsPanel = () => {
@@ -3158,7 +3266,7 @@ const renderDetail = async (root, id) => {
     [isWatched ? "★ Watching" : "☆ Add to Watchlist"]
   );
 
-  const leftCol = el("div", { class: "min-w-0 flex-1" }, [
+  const leftCol = el("div", { class: "min-w-0 w-full lg:flex-none lg:w-[360px]" }, [
     el("div", { class: "flex items-center justify-between gap-2" }, [
       el("div", { class: "text-base font-semibold" }, [
         `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
@@ -3207,7 +3315,7 @@ const renderDetail = async (root, id) => {
   ]);
 
   const card = el("div", { class: "mt-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" }, [
-    el("div", { class: "lg:flex lg:items-start lg:gap-4" }, [leftCol, rightCol]),
+    el("div", { class: "lg:flex lg:items-start lg:gap-2" }, [leftCol, rightCol]),
   ]);
 
   root.appendChild(back);
