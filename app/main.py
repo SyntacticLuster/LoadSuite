@@ -52,7 +52,16 @@ from .api_models import (
     WatchlistResponse,
 )
 from .routecast_cache import RouteCastCache
-from .stores import AlertRulesStore, FilterPresetsStore, PersistentWatchlistStore, PreferencesStore, WatchlistStore
+from .stores import (
+    AlertRulesStore,
+    FilterPresetsStore,
+    PersistentAlertRulesStore,
+    PersistentFilterPresetsStore,
+    PersistentPreferencesStore,
+    PersistentWatchlistStore,
+    PreferencesStore,
+    WatchlistStore,
+)
 from .scoring import ScoringEngine
 from .scoring.models import CompositeScore, UserPreferences
 from .weather import (
@@ -114,14 +123,11 @@ def _build_default_ctx() -> AppContext:
         alert_rules_store = MySQLAlertRulesStore()
         filter_presets_store = MySQLFilterPresetsStore()
     else:
-        if settings.environment in ("production", "staging"):
-            watchlist_store = PersistentWatchlistStore(BASE_DIR / ".runtime" / "watchlist.json")
-        else:
-            watchlist_store = WatchlistStore()
-
-        preferences_store = PreferencesStore()
-        alert_rules_store = AlertRulesStore()
-        filter_presets_store = FilterPresetsStore()
+        runtime_dir = BASE_DIR / ".runtime"
+        watchlist_store = PersistentWatchlistStore(runtime_dir / "watchlist.json")
+        preferences_store = PersistentPreferencesStore(runtime_dir / "preferences.json")
+        alert_rules_store = PersistentAlertRulesStore(runtime_dir / "alerts.json")
+        filter_presets_store = PersistentFilterPresetsStore(runtime_dir / "presets.json")
 
     # Support deterministic synthetic datasets via SYNTHETIC_SEED env var.
     # Cache is process-local; multi-worker deployments will have one cache per worker.

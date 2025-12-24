@@ -753,9 +753,10 @@ const renderWeatherSidebar = () => {
   const routecastWidget = state.uiPrefs.show_routecast
     ? renderRouteCastWidget(state.lastSelectedLoadId, { compact: true })
     : null;
-  const routecastWrap = routecastWidget
-    ? el("div", { style: "padding-bottom: 10px;" }, [routecastWidget])
-    : null;
+  const routecastWrap = el("div", { id: "terminal-routecast-wrap", style: "padding-bottom: 10px;" }, []);
+  if (routecastWidget) routecastWrap.appendChild(routecastWidget);
+  routecastWrap.style.display = state.uiPrefs.show_routecast ? "" : "none";
+  routecastWrap.setAttribute("aria-hidden", state.uiPrefs.show_routecast ? "false" : "true");
 
   return el("div", { class: "space-y-3" }, [
     routecastWrap,
@@ -1794,6 +1795,10 @@ const setWorkflowsOpen = async (open) => {
 const setRoutecastVisible = (visible) => {
   state.uiPrefs.show_routecast = !!visible;
   setUiPrefs(state.uiPrefs);
+  const wrap = document.getElementById("terminal-routecast-wrap");
+  if (wrap && state.uiPrefs.show_routecast && !wrap.hasChildNodes()) {
+    wrap.appendChild(renderRouteCastWidget(state.lastSelectedLoadId, { compact: true }));
+  }
   setNodeVisible("terminal-routecast-wrap", state.uiPrefs.show_routecast);
 };
 
@@ -2087,17 +2092,30 @@ const renderList = async (root) => {
   top.appendChild(searchRow);
 
   const leftRailBody = el("div", { class: "space-y-3" });
-  if (state.filtersOpen) {
-    leftRailBody.appendChild(el("div", { class: "space-y-3 pt-3" }, [renderFiltersPanel()]));
-  }
+  const filtersPanel = el("div", { id: "terminal-filters-panel", class: "space-y-3 pt-3" }, [
+    renderFiltersPanel(),
+  ]);
+  filtersPanel.style.display = state.filtersOpen ? "" : "none";
+  filtersPanel.setAttribute("aria-hidden", state.filtersOpen ? "false" : "true");
+  leftRailBody.appendChild(filtersPanel);
 
-  if (state.greenlightOpen) {
-    leftRailBody.appendChild(el("div", { class: "space-y-3 pt-3" }, [renderPrefsPanel()]));
-  }
+  const greenlightPanel = el("div", { id: "terminal-greenlight-panel", class: "space-y-3 pt-3" }, [
+    renderPrefsPanel(),
+  ]);
+  greenlightPanel.style.display = state.greenlightOpen ? "" : "none";
+  greenlightPanel.setAttribute("aria-hidden", state.greenlightOpen ? "false" : "true");
+  leftRailBody.appendChild(greenlightPanel);
 
+  const workflowsPanel = el("div", { id: "terminal-workflows-panel" }, []);
   if (state.terminalPanelOpen) {
-    leftRailBody.appendChild(renderTerminalPanel());
+    workflowsPanel.appendChild(renderTerminalPanel());
+    workflowsPanel.style.display = "";
+    workflowsPanel.setAttribute("aria-hidden", "false");
+  } else {
+    workflowsPanel.style.display = "none";
+    workflowsPanel.setAttribute("aria-hidden", "true");
   }
+  leftRailBody.appendChild(workflowsPanel);
 
   const leftHandle = el("div", {
     id: "terminal-left-handle",
@@ -2774,10 +2792,10 @@ const renderTerminalPanel = () => {
 
   let alertNameInput;
   alertsSection.appendChild(
-    el("div", { class: "flex gap-2" }, [
+    el("div", { class: "flex flex-wrap gap-2" }, [
       (alertNameInput = el("input", {
         class:
-          "flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900",
+          "min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900",
         placeholder: "Alert name (uses current filters)…",
       })),
       el(
