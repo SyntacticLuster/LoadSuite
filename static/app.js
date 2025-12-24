@@ -222,8 +222,10 @@ const weatherEmojiForText = (text, { isDay } = {}) => {
   if (t.includes("sleet") || t.includes("freezing rain") || t.includes("ice")) return "🧊";
   if (t.includes("snow") || t.includes("flurr")) return "🌨️";
   if (t.includes("rain") || t.includes("shower") || t.includes("drizzle")) return "🌧️";
-  if (t.includes("fog") || t.includes("mist")) return "🌫️";
-  if (t.includes("smoke") || t.includes("haze") || t.includes("dust") || t.includes("sand")) return "🌫️";
+  // Some clients (older Android/Windows fonts) render 🌫️ as a missing-glyph box.
+  // Use ☁️ as the fallback so the UI stays readable.
+  if (t.includes("fog") || t.includes("mist")) return "☁️";
+  if (t.includes("smoke") || t.includes("haze") || t.includes("dust") || t.includes("sand")) return "☁️";
   if (t.includes("wind")) return "💨";
 
   // Cloud coverage
