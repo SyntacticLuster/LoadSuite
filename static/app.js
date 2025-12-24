@@ -3314,7 +3314,7 @@ const renderDetail = async (root, id) => {
     renderRouteCastWidget(id, { compact: false, load }),
   ]);
 
-  const card = el("div", { class: "mt-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" }, [
+  const card = el("div", { class: "mt-3 w-full lg:w-fit rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" }, [
     el("div", { class: "lg:flex lg:items-start lg:gap-2" }, [leftCol, rightCol]),
   ]);
 
