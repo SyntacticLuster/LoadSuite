@@ -12,13 +12,15 @@ const el = (tag, attrs = {}, children = []) => {
   return node;
 };
 
+const THEME_STORAGE_KEY = "lb_theme";
+
 const getTheme = () => {
   try {
-    const t = localStorage.getItem("lb_theme");
-    return t === "light" ? "light" : "dark";
-  } catch {
-    return "dark";
-  }
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "dark" || stored === "light") return stored;
+  } catch {}
+  const cookieMatch = document.cookie.match(new RegExp(`(?:^|; )${THEME_STORAGE_KEY}=(dark|light)`));
+  return cookieMatch ? cookieMatch[1] : "dark";
 };
 
 const applyTheme = (theme) => {
@@ -27,8 +29,9 @@ const applyTheme = (theme) => {
 
 const setTheme = (theme) => {
   try {
-    localStorage.setItem("lb_theme", theme);
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {}
+  document.cookie = `${THEME_STORAGE_KEY}=${theme};path=/;max-age=${365 * 24 * 60 * 60}`;
   applyTheme(theme);
 };
 
@@ -813,12 +816,13 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
     window.location.hash = `#/load/${encodeURIComponent(id)}`;
   };
 
-  const logoBlockChildren = [
-    el("img", {
-      src: toAppUrl("/static/images/rc_logo.png"),
-      alt: "RouteCast",
-      class: "h-14 w-auto object-contain",
-    }),
+    const logoBlockChildren = [
+      el("img", {
+        src: toAppUrl("/static/images/rc_logo.png"),
+        alt: "RouteCast",
+        class: "w-auto object-contain",
+        style: "height: 3.85rem;",
+      }),
     isCollapsed && hasRouteAlerts
       ? el(
           "div",
@@ -826,7 +830,7 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
           ["Alerts exist on route"]
         )
       : null,
-  ];
+    ];
 
   const bodyId = `routecast-body-${compact ? "compact" : "full"}`;
   let toggleBtn;
@@ -839,6 +843,7 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
         {
           class: `flex flex-col items-start gap-1${id ? " cursor-pointer" : ""}`,
           title: id ? "Open load detail" : "RouteCast",
+          style: "gap: 0.225rem; padding-top: calc(0.5rem * 0.9); padding-bottom: calc(0.5rem * 0.9);",
           onclick: () => {
             if (id) jumpToLoadDetail();
           },
@@ -1863,8 +1868,16 @@ const renderList = async (root) => {
     },
   });
 
-  const leftRail = el("aside", { id: "terminal-left-rail", class: "relative" });
-  const rightRail = el("aside", { id: "terminal-right-rail", class: "relative" });
+  const leftRail = el("aside", {
+    id: "terminal-left-rail",
+    class: "relative sticky self-start",
+    style: "top: calc(4rem - 13px);",
+  });
+  const rightRail = el("aside", {
+    id: "terminal-right-rail",
+    class: "relative sticky self-start",
+    style: "top: 4rem;",
+  });
   const main = el("section", { id: "terminal-center", class: "min-w-0" });
   const mainInner = el("div", {
     id: "terminal-center-inner",
@@ -2106,7 +2119,14 @@ const renderList = async (root) => {
   greenlightPanel.setAttribute("aria-hidden", state.greenlightOpen ? "false" : "true");
   leftRailBody.appendChild(greenlightPanel);
 
-  const workflowsPanel = el("div", { id: "terminal-workflows-panel" }, []);
+  const workflowsPanel = el(
+    "div",
+    {
+      id: "terminal-workflows-panel",
+      class: "max-h-[calc(100vh-360px)] overflow-y-auto",
+    },
+    []
+  );
   if (state.terminalPanelOpen) {
     workflowsPanel.appendChild(renderTerminalPanel());
     workflowsPanel.style.display = "";

@@ -16,11 +16,22 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       (() => {
+        const STORAGE_KEY = "lb_theme";
+        const DEFAULT_THEME = "dark";
+        let theme = DEFAULT_THEME;
         try {
-          const theme = localStorage.getItem("lb_theme");
-          const isDark = theme === "dark" || theme === null;
-          document.documentElement.classList.toggle("dark", isDark);
-        } catch {}
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored === "dark" || stored === "light") {
+            theme = stored;
+          } else {
+            const cookieMatch = document.cookie.match(new RegExp(`(?:^|; )${STORAGE_KEY}=(dark|light)`));
+            if (cookieMatch) theme = cookieMatch[1];
+          }
+        } catch {
+          const cookieMatch = document.cookie.match(new RegExp(`(?:^|; )${STORAGE_KEY}=(dark|light)`));
+          if (cookieMatch) theme = cookieMatch[1];
+        }
+        document.documentElement.classList.toggle("dark", theme !== "light");
       })();
     </script>
     <style>
@@ -50,10 +61,12 @@
         text-decoration: none;
         font-size: 0.75rem;
         letter-spacing: 0.03em;
+        text-shadow: 0 0 2px rgba(16, 185, 129, 0.25);
+        transition: text-shadow 200ms ease;
       }
 
       #greenlight-ticker .greenlight-marquee-track a:hover {
-        text-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+        text-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
       }
 
       #news-ticker {
@@ -157,8 +170,8 @@
               class="h-12 w-auto object-contain"
             />
           </a>
-          <div>
-            <div class="text-lg font-semibold leading-tight">Terminal v0.1.4</div>
+          <div class="relative" style="top: calc(0.5rem - 5px);">
+            <div class="text-lg font-semibold leading-tight" style="margin-bottom: -5px;">Terminal v0.1.4</div>
             <div id="meta" class="text-xs text-slate-600 dark:text-slate-400"></div>
           </div>
         </div>
