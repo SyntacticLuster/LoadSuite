@@ -38,11 +38,23 @@ const GREENLIGHT_DEFAULTS_STORAGE_KEY = "lb_greenlight_defaults";
 const FILTER_DEFAULTS_STORAGE_KEY = "lb_filter_defaults";
 const UI_PREFS_STORAGE_KEY = "lb_ui_prefs";
 
+const DEFAULT_LEFT_RAIL_WIDTH = 360;
+const DEFAULT_RIGHT_RAIL_WIDTH = 380;
+const LAYOUT_BREAKPOINTS = {
+  collapseRight: 1100,
+  collapseBoth: 900,
+  wide: 1400,
+};
+
 const DEFAULT_UI_PREFS = {
   show_greenlight_ticker: true,
   show_news_ticker: true,
   show_sidebar: true,
   greenlight_full_row: false,
+  left_rail_width: DEFAULT_LEFT_RAIL_WIDTH,
+  right_rail_width: DEFAULT_RIGHT_RAIL_WIDTH,
+  show_routecast: true,
+  layout_saved: null,
 };
 
 const getUiPrefs = () => {
@@ -60,6 +72,32 @@ const setUiPrefs = (prefs) => {
   try {
     localStorage.setItem(UI_PREFS_STORAGE_KEY, JSON.stringify(prefs ?? {}));
   } catch {}
+};
+
+const getViewportWidth = () => (typeof window === "undefined" ? 0 : window.innerWidth || 0);
+
+const getTerminalLayoutMode = () => {
+  const width = getViewportWidth();
+  if (width && width < LAYOUT_BREAKPOINTS.collapseBoth) return "narrow";
+  if (width && width < LAYOUT_BREAKPOINTS.collapseRight) return "mid";
+  return "wide";
+};
+
+const getRailBounds = (side) => {
+  const width = getViewportWidth();
+  const min = side === "left" ? 300 : 320;
+  const maxPx = side === "left" ? 420 : 460;
+  const maxVw = side === "left" ? 0.24 : 0.28;
+  const vwMax = Math.floor(width * maxVw);
+  const max = Math.max(min, Math.min(maxPx, vwMax || maxPx));
+  return { min, max };
+};
+
+const clampRailWidth = (side, value) => {
+  const bounds = getRailBounds(side);
+  const fallback = side === "left" ? DEFAULT_LEFT_RAIL_WIDTH : DEFAULT_RIGHT_RAIL_WIDTH;
+  const candidate = Number(value) || fallback;
+  return Math.max(bounds.min, Math.min(bounds.max, candidate));
 };
 
 const applyUiPrefsToShell = () => {
@@ -358,11 +396,22 @@ const DEFAULT_PREFS = {
 
 const state = {
   filtersOpen: false,
+  greenlightOpen: false,
   terminalPanelOpen: false,
   ui: {
     collapseForecast: true,
     collapseAlerts: true,
     collapseRouteCast: false,
+    panelsOpen: false,
+  },
+  layout: {
+    mode: "wide",
+    leftOpen: true,
+    rightOpen: true,
+    leftWidth: DEFAULT_LEFT_RAIL_WIDTH,
+    rightWidth: DEFAULT_RIGHT_RAIL_WIDTH,
+    resizeRaf: 0,
+    lastShowSidebar: true,
   },
   uiPrefs: { ...DEFAULT_UI_PREFS },
   query: { ...DEFAULT_QUERY },
@@ -686,13 +735,15 @@ const renderWeatherSidebar = () => {
   );
 
   // RouteCast (last selected load) lives under the weather widgets.
-  const routecastWidget = renderRouteCastWidget(state.lastSelectedLoadId, { compact: true });
+  const routecastWidget = state.uiPrefs.show_routecast
+    ? renderRouteCastWidget(state.lastSelectedLoadId, { compact: true })
+    : null;
 
-  return el("div", { class: "order-first lg:order-none space-y-3 lg:w-80 lg:flex-shrink-0 lg:sticky lg:top-16 lg:self-start" }, [
+  return el("div", { class: "space-y-3" }, [
     routecastWidget,
     alertsWidget,
     forecastWidget,
-  ]);
+  ].filter(Boolean));
 };
 
 const fetchRouteCast = async (loadId) => {
@@ -1518,14 +1569,336 @@ const renderPaginationRow = (total) => {
   );
 };
 
+const persistRailWidth = (side, width) => {
+  const clamped = clampRailWidth(side, width);
+  if (side === "left") state.uiPrefs.left_rail_width = clamped;
+  else state.uiPrefs.right_rail_width = clamped;
+  setUiPrefs(state.uiPrefs);
+  return clamped;
+};
+
+const saveLayoutPrefs = () => {
+  state.uiPrefs.left_rail_width = state.layout.leftWidth;
+  state.uiPrefs.right_rail_width = state.layout.rightWidth;
+  state.uiPrefs.show_sidebar = !!state.uiPrefs.show_sidebar;
+  state.uiPrefs.show_routecast = !!state.uiPrefs.show_routecast;
+  state.uiPrefs.layout_saved = {
+    left_open: !!state.layout.leftOpen,
+    right_open: !!state.layout.rightOpen,
+    filters_open: !!state.filtersOpen,
+    greenlight_open: !!state.greenlightOpen,
+    workflows_open: !!state.terminalPanelOpen,
+  };
+  setUiPrefs(state.uiPrefs);
+};
+
+const resetLayoutPrefs = () => {
+  state.uiPrefs.left_rail_width = DEFAULT_LEFT_RAIL_WIDTH;
+  state.uiPrefs.right_rail_width = DEFAULT_RIGHT_RAIL_WIDTH;
+  state.uiPrefs.show_sidebar = true;
+  state.uiPrefs.show_routecast = true;
+  state.uiPrefs.layout_saved = null;
+  setUiPrefs(state.uiPrefs);
+  state.layout.leftWidth = DEFAULT_LEFT_RAIL_WIDTH;
+  state.layout.rightWidth = DEFAULT_RIGHT_RAIL_WIDTH;
+  state.layout.leftOpen = state.layout.mode !== "narrow";
+  state.layout.rightOpen = state.layout.mode === "wide";
+  state.layout.lastShowSidebar = state.uiPrefs.show_sidebar;
+  state.filtersOpen = false;
+  state.greenlightOpen = false;
+  state.terminalPanelOpen = false;
+  applyTerminalLayout();
+};
+
+const applyTerminalLayout = () => {
+  const layout = document.getElementById("terminal-layout");
+  if (!layout) return;
+
+  const leftRail = document.getElementById("terminal-left-rail");
+  const rightRail = document.getElementById("terminal-right-rail");
+  const leftHandle = document.getElementById("terminal-left-handle");
+  const rightHandle = document.getElementById("terminal-right-handle");
+  const backdrop = document.getElementById("terminal-rail-backdrop");
+  const leftToggle = document.getElementById("terminal-left-toggle");
+  const rightToggle = document.getElementById("terminal-right-toggle");
+
+  const mode = getTerminalLayoutMode();
+  if (state.layout.mode !== mode) {
+    state.layout.mode = mode;
+    state.layout.leftOpen = mode !== "narrow";
+    state.layout.rightOpen = mode === "wide";
+  }
+
+  const showSidebar = state.uiPrefs.show_sidebar;
+  if (state.layout.lastShowSidebar !== showSidebar) {
+    state.layout.lastShowSidebar = showSidebar;
+    state.layout.rightOpen = showSidebar && mode === "wide";
+  }
+
+  if (!showSidebar) {
+    state.layout.rightOpen = false;
+  }
+
+  state.layout.leftWidth = clampRailWidth("left", state.layout.leftWidth || state.uiPrefs.left_rail_width);
+  state.layout.rightWidth = clampRailWidth("right", state.layout.rightWidth || state.uiPrefs.right_rail_width);
+
+  const leftWidth = state.layout.leftWidth;
+  const rightWidth = state.layout.rightWidth;
+
+  if (mode === "wide") {
+    layout.style.gridTemplateColumns = `${state.layout.leftOpen ? `${leftWidth}px` : "0px"} minmax(0, 1fr) ${state.layout.rightOpen ? `${rightWidth}px` : "0px"}`;
+  } else if (mode === "mid") {
+    layout.style.gridTemplateColumns = `${state.layout.leftOpen ? `${leftWidth}px` : "0px"} minmax(0, 1fr)`;
+  } else {
+    layout.style.gridTemplateColumns = "minmax(0, 1fr)";
+  }
+
+  const overlayClasses = [
+    "fixed",
+    "z-40",
+    "top-16",
+    "bottom-0",
+    "overflow-y-auto",
+    "bg-white",
+    "dark:bg-slate-950",
+    "border",
+    "border-slate-200",
+    "dark:border-slate-800",
+    "shadow-xl",
+    "p-3",
+  ];
+
+  const updateRail = (rail, side, open, overlay, widthPx) => {
+    if (!rail) return;
+    if (!open) {
+      rail.style.display = "none";
+      rail.setAttribute("aria-hidden", "true");
+      return;
+    }
+
+    rail.style.display = "";
+    rail.setAttribute("aria-hidden", "false");
+    for (const cls of overlayClasses) {
+      rail.classList.toggle(cls, !!overlay);
+    }
+    if (overlay) {
+      rail.style.width = `${widthPx}px`;
+      rail.style.left = side === "left" ? "0" : "";
+      rail.style.right = side === "right" ? "0" : "";
+    } else {
+      rail.style.width = "100%";
+      rail.style.left = "";
+      rail.style.right = "";
+    }
+  };
+
+  updateRail(leftRail, "left", state.layout.leftOpen, mode === "narrow", leftWidth);
+  updateRail(rightRail, "right", state.layout.rightOpen, mode !== "wide", rightWidth);
+
+  if (leftHandle) leftHandle.style.display = mode === "wide" && state.layout.leftOpen ? "" : "none";
+  if (rightHandle) rightHandle.style.display = mode === "wide" && state.layout.rightOpen ? "" : "none";
+
+  if (leftToggle) {
+    leftToggle.textContent = state.layout.leftOpen ? "Hide Controls" : "Show Controls";
+    leftToggle.setAttribute("aria-pressed", state.layout.leftOpen ? "true" : "false");
+  }
+
+  if (rightToggle) {
+    if (!state.uiPrefs.show_sidebar) {
+      rightToggle.style.display = "none";
+    } else {
+      rightToggle.style.display = "";
+      rightToggle.textContent = state.layout.rightOpen ? "Hide Context" : "Show Context";
+      rightToggle.setAttribute("aria-pressed", state.layout.rightOpen ? "true" : "false");
+    }
+  }
+
+  if (backdrop) {
+    const showBackdrop =
+      mode === "narrow"
+        ? state.layout.leftOpen || state.layout.rightOpen
+        : mode === "mid"
+          ? state.layout.rightOpen
+          : false;
+    backdrop.style.display = showBackdrop ? "" : "none";
+  }
+};
+
+const toggleRail = (side) => {
+  if (side === "right" && !state.uiPrefs.show_sidebar) return;
+  if (side === "left") state.layout.leftOpen = !state.layout.leftOpen;
+  if (side === "right") state.layout.rightOpen = !state.layout.rightOpen;
+  applyTerminalLayout();
+};
+
+const beginRailResize = (side) => (event) => {
+  if (event.button !== 0) return;
+  if (state.layout.mode !== "wide") return;
+  event.preventDefault();
+
+  const startX = event.clientX;
+  const startWidth = side === "left" ? state.layout.leftWidth : state.layout.rightWidth;
+  let moveRaf = 0;
+
+  const onMove = (moveEvent) => {
+    const nextX = moveEvent.clientX;
+    if (moveRaf) return;
+    moveRaf = window.requestAnimationFrame(() => {
+      moveRaf = 0;
+      const delta = nextX - startX;
+      const nextWidth = side === "left" ? startWidth + delta : startWidth - delta;
+      const clamped = clampRailWidth(side, nextWidth);
+      if (side === "left") state.layout.leftWidth = clamped;
+      else state.layout.rightWidth = clamped;
+      applyTerminalLayout();
+    });
+  };
+
+  const onUp = () => {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    if (moveRaf) window.cancelAnimationFrame(moveRaf);
+    const finalWidth = side === "left" ? state.layout.leftWidth : state.layout.rightWidth;
+    persistRailWidth(side, finalWidth);
+    if (document.body) document.body.classList.remove("select-none");
+  };
+
+  if (document.body) document.body.classList.add("select-none");
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+};
+
 const renderList = async (root) => {
-  const layout = el("div", { class: "flex flex-col gap-4 lg:flex-row" });
-  const sidebar = state.uiPrefs.show_sidebar ? renderWeatherSidebar() : null;
-  const main = el("div", { class: "min-w-0 flex-1 order-last lg:order-none" });
+  const layout = el("div", { id: "terminal-layout", class: "grid gap-4 items-start" });
+  const railBackdrop = el("div", {
+    id: "terminal-rail-backdrop",
+    class: "fixed inset-0 z-30 bg-slate-900/30",
+    style: "display: none",
+    onclick: () => {
+      if (state.layout.mode === "mid") {
+        state.layout.rightOpen = false;
+      } else {
+        state.layout.leftOpen = false;
+        state.layout.rightOpen = false;
+      }
+      applyTerminalLayout();
+    },
+  });
 
-  const top = el("div", { class: "space-y-3" });
+  const leftRail = el("aside", { id: "terminal-left-rail", class: "relative" });
+  const rightRail = el("aside", { id: "terminal-right-rail", class: "relative" });
+  const main = el("section", { id: "terminal-center", class: "min-w-0" });
+  const mainInner = el("div", {
+    id: "terminal-center-inner",
+    class: "mx-auto w-full max-w-[1200px]",
+    style: "min-width: min(720px, 100%);",
+  });
 
-  const searchRow = el("div", { class: "flex gap-2" }, [
+  const top = el("div", { class: "space-y-2" });
+
+  const panelsBtn = el(
+    "button",
+    {
+      type: "button",
+      class:
+        "rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
+      title: "Panels",
+      "aria-expanded": state.ui.panelsOpen ? "true" : "false",
+      onclick: () => {
+        state.ui.panelsOpen = !state.ui.panelsOpen;
+        render();
+      },
+    },
+    ["Panels"]
+  );
+
+  const panelItem = (label, checked, onChange) =>
+    el("label", { class: "flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300" }, [
+      el("span", {}, [label]),
+      el("input", {
+        type: "checkbox",
+        class: "h-4 w-4",
+        checked: checked ? "checked" : undefined,
+        onchange: onChange,
+      }),
+    ]);
+
+  const panelsMenu = el(
+    "div",
+    {
+      class:
+        "absolute right-0 z-30 mt-2 w-64 rounded-lg border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-800 dark:bg-slate-900",
+      style: state.ui.panelsOpen ? "" : "display: none",
+    },
+    [
+      panelItem("Controls (left rail)", state.layout.leftOpen, (e) => {
+        state.layout.leftOpen = !!e.target.checked;
+        applyTerminalLayout();
+      }),
+      panelItem("Filters (left section)", state.filtersOpen, (e) => {
+        state.filtersOpen = !!e.target.checked;
+        render();
+      }),
+      panelItem("GreenLight (left section)", state.greenlightOpen, (e) => {
+        state.greenlightOpen = !!e.target.checked;
+        render();
+      }),
+      panelItem("Workflows (top/left)", state.terminalPanelOpen, async (e) => {
+        state.terminalPanelOpen = !!e.target.checked;
+        if (state.terminalPanelOpen) {
+          await Promise.all([fetchWatchlist(), fetchFilterPresets(), refreshAlerts()]);
+        }
+        render();
+      }),
+      panelItem("Context (right rail)", state.uiPrefs.show_sidebar && state.layout.rightOpen, (e) => {
+        const next = !!e.target.checked;
+        state.uiPrefs.show_sidebar = next;
+        setUiPrefs(state.uiPrefs);
+        state.layout.rightOpen = next;
+        applyTerminalLayout();
+        render();
+      }),
+      panelItem("RouteCast (right section)", state.uiPrefs.show_routecast, (e) => {
+        state.uiPrefs.show_routecast = !!e.target.checked;
+        setUiPrefs(state.uiPrefs);
+        render();
+      }),
+      el("div", { class: "mt-3 flex flex-col gap-2" }, [
+        el(
+          "button",
+          {
+            type: "button",
+            class:
+              "w-full rounded-md border border-sky-500 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
+            onclick: () => {
+              saveLayoutPrefs();
+              state.ui.panelsOpen = false;
+              render();
+            },
+          },
+          ["Save layout"]
+        ),
+        el(
+          "button",
+          {
+            type: "button",
+            class:
+              "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300",
+            onclick: () => {
+              resetLayoutPrefs();
+              state.ui.panelsOpen = false;
+              render();
+            },
+          },
+          ["Reset layout"]
+        ),
+      ]),
+    ]
+  );
+
+  const panelsWrap = el("div", { class: "relative inline-flex" }, [panelsBtn, panelsMenu]);
+
+  const searchRow = el("div", { class: "flex items-start gap-2" }, [
     el("input", {
       class:
         "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-800 dark:bg-slate-900",
@@ -1535,69 +1908,63 @@ const renderList = async (root) => {
         state.query.q = e.target.value;
       },
     }),
-    el(
-      "button",
-      {
-        class:
-          "shrink-0 rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
-        onclick: () => {
-          state.listPage = 0;
-          render();
+    el("div", { class: "flex shrink-0 flex-col gap-2" }, [
+      el(
+        "button",
+        {
+          class:
+            "rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
+          onclick: () => {
+            state.listPage = 0;
+            render();
+          },
         },
-      },
-      ["Search"]
-    ),
+        ["Search"]
+      ),
+      panelsWrap,
+    ]),
   ]);
-
-  const filtersBtn = el(
-    "button",
-    {
-      class:
-        "flex-1 rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-left text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
-      onclick: () => {
-        state.filtersOpen = !state.filtersOpen;
-        render();
-      },
-    },
-    [
-      state.filtersOpen ? "Hide Filters & GreenLight" : "Show Filters & GreenLight",
-    ]
-  );
-
-  const terminalBtn = el(
-    "button",
-    {
-      class:
-        "flex-1 rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-left text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
-      onclick: async () => {
-        state.terminalPanelOpen = !state.terminalPanelOpen;
-        if (state.terminalPanelOpen) {
-          await Promise.all([fetchWatchlist(), fetchFilterPresets(), refreshAlerts()]);
-        }
-        render();
-      },
-    },
-    [state.terminalPanelOpen ? "Hide Terminal Workflows" : "Terminal Workflows"]
-  );
 
   top.appendChild(searchRow);
 
-  top.appendChild(el("div", { class: "flex flex-col gap-2 sm:flex-row" }, [filtersBtn, terminalBtn]));
-
+  const leftRailBody = el("div", { class: "space-y-3" });
   if (state.filtersOpen) {
-    const panels = el(
-      "div",
-      {
-        class: "space-y-3 pt-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0",
-      },
-      [renderFiltersPanel(), renderPrefsPanel()]
-    );
-    top.appendChild(panels);
+    leftRailBody.appendChild(el("div", { class: "space-y-3 pt-3" }, [renderFiltersPanel()]));
+  }
+
+  if (state.greenlightOpen) {
+    leftRailBody.appendChild(el("div", { class: "space-y-3 pt-3" }, [renderPrefsPanel()]));
   }
 
   if (state.terminalPanelOpen) {
-    top.appendChild(renderTerminalPanel());
+    leftRailBody.appendChild(renderTerminalPanel());
   }
+
+  const leftHandle = el("div", {
+    id: "terminal-left-handle",
+    class:
+      "absolute top-0 right-0 z-10 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-slate-200/60 dark:hover:bg-slate-700/40",
+    title: "Resize controls rail",
+    onmousedown: beginRailResize("left"),
+  });
+
+  leftRail.appendChild(leftRailBody);
+  leftRail.appendChild(leftHandle);
+
+  if (state.uiPrefs.show_sidebar) {
+    const sidebar = renderWeatherSidebar();
+    sidebar.classList.add("sticky", "top-16");
+    rightRail.appendChild(sidebar);
+  }
+
+  const rightHandle = el("div", {
+    id: "terminal-right-handle",
+    class:
+      "absolute top-0 left-0 z-10 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-slate-200/60 dark:hover:bg-slate-700/40",
+    title: "Resize context rail",
+    onmousedown: beginRailResize("right"),
+  });
+  rightRail.appendChild(rightHandle);
 
   const sortSelect = (() => {
     const s = el(
@@ -1642,10 +2009,14 @@ const renderList = async (root) => {
     ),
   ]);
   top.appendChild(listWrap);
-  main.appendChild(top);
+  mainInner.appendChild(top);
+  main.appendChild(mainInner);
+  layout.appendChild(leftRail);
   layout.appendChild(main);
-  if (sidebar) layout.appendChild(sidebar);
+  layout.appendChild(rightRail);
   root.appendChild(layout);
+  root.appendChild(railBackdrop);
+  applyTerminalLayout();
 
   await fetchWatchlist();
   await fetchFilterPresets();
@@ -2942,5 +3313,30 @@ syncPreferences(state.prefs);
   if (defaults) state.uiPrefs = { ...state.uiPrefs, ...defaults };
   applyUiPrefsToShell();
 }
+state.layout.leftWidth = clampRailWidth("left", state.uiPrefs.left_rail_width);
+state.layout.rightWidth = clampRailWidth("right", state.uiPrefs.right_rail_width);
+state.layout.mode = getTerminalLayoutMode();
+state.layout.leftOpen = state.layout.mode !== "narrow";
+state.layout.rightOpen = state.layout.mode === "wide" && state.uiPrefs.show_sidebar;
+state.layout.lastShowSidebar = state.uiPrefs.show_sidebar;
+{
+  const saved = state.uiPrefs.layout_saved;
+  if (saved && typeof saved === "object") {
+    state.filtersOpen = !!saved.filters_open;
+    state.greenlightOpen = !!saved.greenlight_open;
+    state.terminalPanelOpen = !!saved.workflows_open;
+    if (state.layout.mode === "wide") {
+      state.layout.leftOpen = !!saved.left_open;
+      state.layout.rightOpen = !!saved.right_open && state.uiPrefs.show_sidebar;
+    }
+  }
+}
+window.addEventListener("resize", () => {
+  if (state.layout.resizeRaf) return;
+  state.layout.resizeRaf = window.requestAnimationFrame(() => {
+    state.layout.resizeRaf = 0;
+    applyTerminalLayout();
+  });
+});
 setMeta().then(render);
 initNewsTicker();
