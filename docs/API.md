@@ -350,16 +350,24 @@ Get current user scoring preferences.
 
 ```json
 {
-  "category_profitability": 1.0,
-  "category_feasibility": 1.0,
-  "category_risk": 1.2,
-  "category_preference": 0.8,
-  "cost_per_mile_usd": 1.50,
-  "max_deadhead_miles": 200,
-  "max_weight_lbs": 45000,
-  "preferred_equipment": ["Dry Van", "Reefer"],
-  "preferred_lanes": ["ATL_GA:CHI_IL", "DAL_TX:DEN_CO"],
-  "home_base": "ATL_GA"
+  "user_id": "default",
+  "preferences": {
+    "equipment_types": ["Dry Van", "Reefer"],
+    "max_deadhead_miles": 200,
+    "max_weight_lbs": 45000,
+    "min_weight_lbs": 12000,
+    "cost_per_mile": 1.5,
+    "preferred_lanes": ["ATL_GA:CHI_IL", "DAL_TX:DEN_CO"],
+    "home_base": "ATL_GA",
+    "hazmat_endorsed": false,
+    "detention": null,
+    "hazmat": null,
+    "multi_stop": null,
+    "min_broker_rating": 3.5,
+    "min_rpm": 2.5,
+    "greenlight_threshold": 70
+  },
+  "updated_at": "2024-12-19T12:00:00Z"
 }
 ```
 
@@ -373,9 +381,12 @@ Update user scoring preferences.
 
 ```json
 {
-  "category_risk": 1.5,
-  "cost_per_mile_usd": 1.65,
-  "preferred_lanes": ["ATL_GA:CHI_IL"]
+  "min_rpm": 2.75,
+  "max_deadhead_miles": 150,
+  "equipment_types": ["Dry Van"],
+  "detention": false,
+  "hazmat": false,
+  "multi_stop": null
 }
 ```
 
@@ -383,8 +394,9 @@ Update user scoring preferences.
 
 ```json
 {
-  "ok": true,
-  "preferences": { /* updated preferences */ }
+  "user_id": "default",
+  "preferences": { /* updated preferences */ },
+  "updated_at": "2024-12-19T12:05:00Z"
 }
 ```
 

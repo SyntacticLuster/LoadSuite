@@ -140,6 +140,18 @@ class PreferencesModel(BaseModel):
         default=None,
         description="Whether user has hazmat endorsement"
     )
+    detention: Optional[bool] = Field(
+        default=None,
+        description="Require detention flag (true/false) for GreenLight"
+    )
+    hazmat: Optional[bool] = Field(
+        default=None,
+        description="Require hazmat flag (true/false) for GreenLight"
+    )
+    multi_stop: Optional[bool] = Field(
+        default=None,
+        description="Require multi-stop flag (true/false) for GreenLight"
+    )
     min_broker_rating: Optional[float] = Field(
         default=None, ge=0, le=5,
         description="Minimum acceptable broker rating"

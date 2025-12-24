@@ -48,7 +48,8 @@ SortKey = Literal["composite", "rpm_desc", "pickup_soonest", "deadhead_asc", "br
 
 
 class RefreshRequest(BaseModel):
-    count: int = Field(default=200, ge=1, le=5000)
+    count: int = Field(default=200, ge=1, le=10000)
+    seed: int | None = None  # Optional explicit seed for deterministic refreshes
 
 
 class LoadsQuery(BaseModel):

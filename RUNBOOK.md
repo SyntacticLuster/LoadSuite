@@ -10,6 +10,32 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8035
 - Same-machine: http://127.0.0.1:8035
 - Other device on your LAN: `http://<your-lan-ip>:8035`
 
+## Use MySQL persistence (optional)
+
+By default, the app runs in-memory. If you set `USE_DATABASE=true`, user workflow state
+(preferences, watchlist, alerts, filter presets) persists to MySQL.
+
+### Local dev using your server DB (recommended: SSH tunnel)
+
+1. Start an SSH tunnel to your cPanel host so MySQL is not exposed publicly:
+
+```bash
+ssh -p 21098 -L 3307:127.0.0.1:3306 <cpanel_user>@orbitsuite.cloud
+```
+
+2. In your local `.env` (do not commit), set:
+
+```bash
+USE_DATABASE=true
+DATABASE_URL=mysql://<db_user>:<db_pass>@127.0.0.1:3307/orbiizny_loadsuite?charset=utf8mb4
+```
+
+3. Initialize the schema once (safe to re-run):
+
+```bash
+DATABASE_URL="$DATABASE_URL" poetry run python scripts/init_db.py
+```
+
 ## Deploy (cPanel / Passenger)
 
 This repo includes an opinionated helper script for the cPanel + Passenger setup described in `docs/CPANEL_DEPLOYMENT.md`.

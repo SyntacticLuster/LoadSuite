@@ -12,6 +12,13 @@ This repository powers the **FreightLens MVP** bundle: a single FastAPI backend 
    ```
 3. Activate the virtualenv if you want to reuse `poetry run` implicitly (`poetry shell`) or prefix commands with `poetry run`.
 
+## Dev Container (VS Code)
+
+This repo includes a Dev Container configuration in `.devcontainer/` that uses Python 3.13 + Poetry and installs dependencies on first start.
+
+- In VS Code: open the Command Palette → **Dev Containers: Reopen in Container**.
+- Once attached, your interpreter is `${workspaceFolder}/.venv/bin/python` and you can run `poetry run pytest`.
+
 ## Run the server
 
 ```bash

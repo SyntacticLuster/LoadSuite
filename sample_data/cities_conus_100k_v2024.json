@@ -1,0 +1,972 @@
+[
+  {
+    "city": "Birmingham",
+    "state": "AL",
+    "pop_2024": 100000,
+    "lat": 33.5186,
+    "lng": -86.8104,
+    "source": "fallback",
+    "raw_place": "Birmingham",
+    "raw_state": "AL"
+  },
+  {
+    "city": "Mobile",
+    "state": "AL",
+    "pop_2024": 100000,
+    "lat": 30.6954,
+    "lng": -88.0399,
+    "source": "fallback",
+    "raw_place": "Mobile",
+    "raw_state": "AL"
+  },
+  {
+    "city": "Little Rock",
+    "state": "AR",
+    "pop_2024": 100000,
+    "lat": 34.7465,
+    "lng": -92.2896,
+    "source": "fallback",
+    "raw_place": "Little Rock",
+    "raw_state": "AR"
+  },
+  {
+    "city": "Phoenix",
+    "state": "AZ",
+    "pop_2024": 100000,
+    "lat": 33.4484,
+    "lng": -112.074,
+    "source": "fallback",
+    "raw_place": "Phoenix",
+    "raw_state": "AZ"
+  },
+  {
+    "city": "Tucson",
+    "state": "AZ",
+    "pop_2024": 100000,
+    "lat": 32.2226,
+    "lng": -110.9747,
+    "source": "fallback",
+    "raw_place": "Tucson",
+    "raw_state": "AZ"
+  },
+  {
+    "city": "Bakersfield",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 35.3733,
+    "lng": -119.0187,
+    "source": "fallback",
+    "raw_place": "Bakersfield",
+    "raw_state": "CA"
+  },
+  {
+    "city": "Chula Vista",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 32.6401,
+    "lng": -117.0842,
+    "source": "fallback",
+    "raw_place": "Chula Vista",
+    "raw_state": "CA"
+  },
+  {
+    "city": "Fresno",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 36.7378,
+    "lng": -119.7871,
+    "source": "fallback",
+    "raw_place": "Fresno",
+    "raw_state": "CA"
+  },
+  {
+    "city": "Long Beach",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 33.7701,
+    "lng": -118.1937,
+    "source": "fallback",
+    "raw_place": "Long Beach",
+    "raw_state": "CA"
+  },
+  {
+    "city": "Los Angeles",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 34.0522,
+    "lng": -118.2437,
+    "source": "fallback",
+    "raw_place": "Los Angeles",
+    "raw_state": "CA"
+  },
+  {
+    "city": "Oakland",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 37.8044,
+    "lng": -122.2711,
+    "source": "fallback",
+    "raw_place": "Oakland",
+    "raw_state": "CA"
+  },
+  {
+    "city": "Riverside",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 33.9806,
+    "lng": -117.3755,
+    "source": "fallback",
+    "raw_place": "Riverside",
+    "raw_state": "CA"
+  },
+  {
+    "city": "Sacramento",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 38.5816,
+    "lng": -121.4944,
+    "source": "fallback",
+    "raw_place": "Sacramento",
+    "raw_state": "CA"
+  },
+  {
+    "city": "San Diego",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 32.7157,
+    "lng": -117.1611,
+    "source": "fallback",
+    "raw_place": "San Diego",
+    "raw_state": "CA"
+  },
+  {
+    "city": "San Francisco",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 37.7749,
+    "lng": -122.4194,
+    "source": "fallback",
+    "raw_place": "San Francisco",
+    "raw_state": "CA"
+  },
+  {
+    "city": "San Jose",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 37.3382,
+    "lng": -121.8863,
+    "source": "fallback",
+    "raw_place": "San Jose",
+    "raw_state": "CA"
+  },
+  {
+    "city": "Stockton",
+    "state": "CA",
+    "pop_2024": 100000,
+    "lat": 37.9577,
+    "lng": -121.2908,
+    "source": "fallback",
+    "raw_place": "Stockton",
+    "raw_state": "CA"
+  },
+  {
+    "city": "Aurora",
+    "state": "CO",
+    "pop_2024": 100000,
+    "lat": 39.7294,
+    "lng": -104.8319,
+    "source": "fallback",
+    "raw_place": "Aurora",
+    "raw_state": "CO"
+  },
+  {
+    "city": "Colorado Springs",
+    "state": "CO",
+    "pop_2024": 100000,
+    "lat": 38.8339,
+    "lng": -104.8214,
+    "source": "fallback",
+    "raw_place": "Colorado Springs",
+    "raw_state": "CO"
+  },
+  {
+    "city": "Denver",
+    "state": "CO",
+    "pop_2024": 100000,
+    "lat": 39.7392,
+    "lng": -104.9903,
+    "source": "fallback",
+    "raw_place": "Denver",
+    "raw_state": "CO"
+  },
+  {
+    "city": "Jacksonville",
+    "state": "FL",
+    "pop_2024": 100000,
+    "lat": 30.3322,
+    "lng": -81.6557,
+    "source": "fallback",
+    "raw_place": "Jacksonville",
+    "raw_state": "FL"
+  },
+  {
+    "city": "Miami",
+    "state": "FL",
+    "pop_2024": 100000,
+    "lat": 25.7617,
+    "lng": -80.1918,
+    "source": "fallback",
+    "raw_place": "Miami",
+    "raw_state": "FL"
+  },
+  {
+    "city": "Orlando",
+    "state": "FL",
+    "pop_2024": 100000,
+    "lat": 28.5383,
+    "lng": -81.3792,
+    "source": "fallback",
+    "raw_place": "Orlando",
+    "raw_state": "FL"
+  },
+  {
+    "city": "St. Petersburg",
+    "state": "FL",
+    "pop_2024": 100000,
+    "lat": 27.7676,
+    "lng": -82.6403,
+    "source": "fallback",
+    "raw_place": "St. Petersburg",
+    "raw_state": "FL"
+  },
+  {
+    "city": "Tallahassee",
+    "state": "FL",
+    "pop_2024": 100000,
+    "lat": 30.4383,
+    "lng": -84.2807,
+    "source": "fallback",
+    "raw_place": "Tallahassee",
+    "raw_state": "FL"
+  },
+  {
+    "city": "Tampa",
+    "state": "FL",
+    "pop_2024": 100000,
+    "lat": 27.9506,
+    "lng": -82.4572,
+    "source": "fallback",
+    "raw_place": "Tampa",
+    "raw_state": "FL"
+  },
+  {
+    "city": "Atlanta",
+    "state": "GA",
+    "pop_2024": 100000,
+    "lat": 33.749,
+    "lng": -84.388,
+    "source": "fallback",
+    "raw_place": "Atlanta",
+    "raw_state": "GA"
+  },
+  {
+    "city": "Des Moines",
+    "state": "IA",
+    "pop_2024": 100000,
+    "lat": 41.5868,
+    "lng": -93.625,
+    "source": "fallback",
+    "raw_place": "Des Moines",
+    "raw_state": "IA"
+  },
+  {
+    "city": "Boise",
+    "state": "ID",
+    "pop_2024": 100000,
+    "lat": 43.615,
+    "lng": -116.2023,
+    "source": "fallback",
+    "raw_place": "Boise",
+    "raw_state": "ID"
+  },
+  {
+    "city": "Chicago",
+    "state": "IL",
+    "pop_2024": 100000,
+    "lat": 41.8781,
+    "lng": -87.6298,
+    "source": "fallback",
+    "raw_place": "Chicago",
+    "raw_state": "IL"
+  },
+  {
+    "city": "Fort Wayne",
+    "state": "IN",
+    "pop_2024": 100000,
+    "lat": 41.0793,
+    "lng": -85.1394,
+    "source": "fallback",
+    "raw_place": "Fort Wayne",
+    "raw_state": "IN"
+  },
+  {
+    "city": "Indianapolis",
+    "state": "IN",
+    "pop_2024": 100000,
+    "lat": 39.7684,
+    "lng": -86.1581,
+    "source": "fallback",
+    "raw_place": "Indianapolis",
+    "raw_state": "IN"
+  },
+  {
+    "city": "Wichita",
+    "state": "KS",
+    "pop_2024": 100000,
+    "lat": 37.6872,
+    "lng": -97.3301,
+    "source": "fallback",
+    "raw_place": "Wichita",
+    "raw_state": "KS"
+  },
+  {
+    "city": "Louisville",
+    "state": "KY",
+    "pop_2024": 100000,
+    "lat": 38.2527,
+    "lng": -85.7585,
+    "source": "fallback",
+    "raw_place": "Louisville",
+    "raw_state": "KY"
+  },
+  {
+    "city": "New Orleans",
+    "state": "LA",
+    "pop_2024": 100000,
+    "lat": 29.9511,
+    "lng": -90.0715,
+    "source": "fallback",
+    "raw_place": "New Orleans",
+    "raw_state": "LA"
+  },
+  {
+    "city": "Shreveport",
+    "state": "LA",
+    "pop_2024": 100000,
+    "lat": 32.5252,
+    "lng": -93.7502,
+    "source": "fallback",
+    "raw_place": "Shreveport",
+    "raw_state": "LA"
+  },
+  {
+    "city": "Boston",
+    "state": "MA",
+    "pop_2024": 100000,
+    "lat": 42.3601,
+    "lng": -71.0589,
+    "source": "fallback",
+    "raw_place": "Boston",
+    "raw_state": "MA"
+  },
+  {
+    "city": "Baltimore",
+    "state": "MD",
+    "pop_2024": 100000,
+    "lat": 39.2904,
+    "lng": -76.6122,
+    "source": "fallback",
+    "raw_place": "Baltimore",
+    "raw_state": "MD"
+  },
+  {
+    "city": "Portland",
+    "state": "ME",
+    "pop_2024": 100000,
+    "lat": 43.6591,
+    "lng": -70.2568,
+    "source": "fallback",
+    "raw_place": "Portland",
+    "raw_state": "ME"
+  },
+  {
+    "city": "Detroit",
+    "state": "MI",
+    "pop_2024": 100000,
+    "lat": 42.3314,
+    "lng": -83.0458,
+    "source": "fallback",
+    "raw_place": "Detroit",
+    "raw_state": "MI"
+  },
+  {
+    "city": "Grand Rapids",
+    "state": "MI",
+    "pop_2024": 100000,
+    "lat": 42.9634,
+    "lng": -85.6681,
+    "source": "fallback",
+    "raw_place": "Grand Rapids",
+    "raw_state": "MI"
+  },
+  {
+    "city": "Minneapolis",
+    "state": "MN",
+    "pop_2024": 100000,
+    "lat": 44.9778,
+    "lng": -93.265,
+    "source": "fallback",
+    "raw_place": "Minneapolis",
+    "raw_state": "MN"
+  },
+  {
+    "city": "Saint Paul",
+    "state": "MN",
+    "pop_2024": 100000,
+    "lat": 44.9537,
+    "lng": -93.09,
+    "source": "fallback",
+    "raw_place": "Saint Paul",
+    "raw_state": "MN"
+  },
+  {
+    "city": "Kansas City",
+    "state": "MO",
+    "pop_2024": 100000,
+    "lat": 39.0997,
+    "lng": -94.5786,
+    "source": "fallback",
+    "raw_place": "Kansas City",
+    "raw_state": "MO"
+  },
+  {
+    "city": "Jackson",
+    "state": "MS",
+    "pop_2024": 100000,
+    "lat": 32.2988,
+    "lng": -90.1848,
+    "source": "fallback",
+    "raw_place": "Jackson",
+    "raw_state": "MS"
+  },
+  {
+    "city": "Charlotte",
+    "state": "NC",
+    "pop_2024": 100000,
+    "lat": 35.2271,
+    "lng": -80.8431,
+    "source": "fallback",
+    "raw_place": "Charlotte",
+    "raw_state": "NC"
+  },
+  {
+    "city": "Durham",
+    "state": "NC",
+    "pop_2024": 100000,
+    "lat": 35.994,
+    "lng": -78.8986,
+    "source": "fallback",
+    "raw_place": "Durham",
+    "raw_state": "NC"
+  },
+  {
+    "city": "Greensboro",
+    "state": "NC",
+    "pop_2024": 100000,
+    "lat": 36.0726,
+    "lng": -79.792,
+    "source": "fallback",
+    "raw_place": "Greensboro",
+    "raw_state": "NC"
+  },
+  {
+    "city": "Raleigh",
+    "state": "NC",
+    "pop_2024": 100000,
+    "lat": 35.7796,
+    "lng": -78.6382,
+    "source": "fallback",
+    "raw_place": "Raleigh",
+    "raw_state": "NC"
+  },
+  {
+    "city": "Fargo",
+    "state": "ND",
+    "pop_2024": 100000,
+    "lat": 46.8772,
+    "lng": -96.7898,
+    "source": "fallback",
+    "raw_place": "Fargo",
+    "raw_state": "ND"
+  },
+  {
+    "city": "Omaha",
+    "state": "NE",
+    "pop_2024": 100000,
+    "lat": 41.2565,
+    "lng": -95.9345,
+    "source": "fallback",
+    "raw_place": "Omaha",
+    "raw_state": "NE"
+  },
+  {
+    "city": "Albuquerque",
+    "state": "NM",
+    "pop_2024": 100000,
+    "lat": 35.0844,
+    "lng": -106.6504,
+    "source": "fallback",
+    "raw_place": "Albuquerque",
+    "raw_state": "NM"
+  },
+  {
+    "city": "Santa Fe",
+    "state": "NM",
+    "pop_2024": 100000,
+    "lat": 35.687,
+    "lng": -105.9378,
+    "source": "fallback",
+    "raw_place": "Santa Fe",
+    "raw_state": "NM"
+  },
+  {
+    "city": "Las Vegas",
+    "state": "NV",
+    "pop_2024": 100000,
+    "lat": 36.1699,
+    "lng": -115.1398,
+    "source": "fallback",
+    "raw_place": "Las Vegas",
+    "raw_state": "NV"
+  },
+  {
+    "city": "Reno",
+    "state": "NV",
+    "pop_2024": 100000,
+    "lat": 39.5296,
+    "lng": -119.8138,
+    "source": "fallback",
+    "raw_place": "Reno",
+    "raw_state": "NV"
+  },
+  {
+    "city": "Buffalo",
+    "state": "NY",
+    "pop_2024": 100000,
+    "lat": 42.8864,
+    "lng": -78.8784,
+    "source": "fallback",
+    "raw_place": "Buffalo",
+    "raw_state": "NY"
+  },
+  {
+    "city": "New York",
+    "state": "NY",
+    "pop_2024": 100000,
+    "lat": 40.7128,
+    "lng": -74.006,
+    "source": "fallback",
+    "raw_place": "New York",
+    "raw_state": "NY"
+  },
+  {
+    "city": "Rochester",
+    "state": "NY",
+    "pop_2024": 100000,
+    "lat": 43.1566,
+    "lng": -77.6088,
+    "source": "fallback",
+    "raw_place": "Rochester",
+    "raw_state": "NY"
+  },
+  {
+    "city": "Syracuse",
+    "state": "NY",
+    "pop_2024": 100000,
+    "lat": 43.0481,
+    "lng": -76.1474,
+    "source": "fallback",
+    "raw_place": "Syracuse",
+    "raw_state": "NY"
+  },
+  {
+    "city": "Yonkers",
+    "state": "NY",
+    "pop_2024": 100000,
+    "lat": 40.9312,
+    "lng": -73.8988,
+    "source": "fallback",
+    "raw_place": "Yonkers",
+    "raw_state": "NY"
+  },
+  {
+    "city": "Akron",
+    "state": "OH",
+    "pop_2024": 100000,
+    "lat": 41.0814,
+    "lng": -81.519,
+    "source": "fallback",
+    "raw_place": "Akron",
+    "raw_state": "OH"
+  },
+  {
+    "city": "Cleveland",
+    "state": "OH",
+    "pop_2024": 100000,
+    "lat": 41.4993,
+    "lng": -81.6944,
+    "source": "fallback",
+    "raw_place": "Cleveland",
+    "raw_state": "OH"
+  },
+  {
+    "city": "Columbus",
+    "state": "OH",
+    "pop_2024": 100000,
+    "lat": 39.9612,
+    "lng": -82.9988,
+    "source": "fallback",
+    "raw_place": "Columbus",
+    "raw_state": "OH"
+  },
+  {
+    "city": "Oklahoma City",
+    "state": "OK",
+    "pop_2024": 100000,
+    "lat": 35.4676,
+    "lng": -97.5164,
+    "source": "fallback",
+    "raw_place": "Oklahoma City",
+    "raw_state": "OK"
+  },
+  {
+    "city": "Tulsa",
+    "state": "OK",
+    "pop_2024": 100000,
+    "lat": 36.15398,
+    "lng": -95.992775,
+    "source": "fallback",
+    "raw_place": "Tulsa",
+    "raw_state": "OK"
+  },
+  {
+    "city": "Portland",
+    "state": "OR",
+    "pop_2024": 100000,
+    "lat": 45.5152,
+    "lng": -122.6784,
+    "source": "fallback",
+    "raw_place": "Portland",
+    "raw_state": "OR"
+  },
+  {
+    "city": "Allentown",
+    "state": "PA",
+    "pop_2024": 100000,
+    "lat": 40.6084,
+    "lng": -75.4902,
+    "source": "fallback",
+    "raw_place": "Allentown",
+    "raw_state": "PA"
+  },
+  {
+    "city": "Philadelphia",
+    "state": "PA",
+    "pop_2024": 100000,
+    "lat": 39.9526,
+    "lng": -75.1652,
+    "source": "fallback",
+    "raw_place": "Philadelphia",
+    "raw_state": "PA"
+  },
+  {
+    "city": "Pittsburgh",
+    "state": "PA",
+    "pop_2024": 100000,
+    "lat": 40.4406,
+    "lng": -79.9959,
+    "source": "fallback",
+    "raw_place": "Pittsburgh",
+    "raw_state": "PA"
+  },
+  {
+    "city": "Providence",
+    "state": "RI",
+    "pop_2024": 100000,
+    "lat": 41.8236,
+    "lng": -71.4222,
+    "source": "fallback",
+    "raw_place": "Providence",
+    "raw_state": "RI"
+  },
+  {
+    "city": "Charleston",
+    "state": "SC",
+    "pop_2024": 100000,
+    "lat": 32.7765,
+    "lng": -79.9311,
+    "source": "fallback",
+    "raw_place": "Charleston",
+    "raw_state": "SC"
+  },
+  {
+    "city": "Columbia",
+    "state": "SC",
+    "pop_2024": 100000,
+    "lat": 34.0007,
+    "lng": -81.0348,
+    "source": "fallback",
+    "raw_place": "Columbia",
+    "raw_state": "SC"
+  },
+  {
+    "city": "Sioux Falls",
+    "state": "SD",
+    "pop_2024": 100000,
+    "lat": 43.5446,
+    "lng": -96.7311,
+    "source": "fallback",
+    "raw_place": "Sioux Falls",
+    "raw_state": "SD"
+  },
+  {
+    "city": "Knoxville",
+    "state": "TN",
+    "pop_2024": 100000,
+    "lat": 35.9606,
+    "lng": -83.9207,
+    "source": "fallback",
+    "raw_place": "Knoxville",
+    "raw_state": "TN"
+  },
+  {
+    "city": "Memphis",
+    "state": "TN",
+    "pop_2024": 100000,
+    "lat": 35.1495,
+    "lng": -90.049,
+    "source": "fallback",
+    "raw_place": "Memphis",
+    "raw_state": "TN"
+  },
+  {
+    "city": "Nashville",
+    "state": "TN",
+    "pop_2024": 100000,
+    "lat": 36.1627,
+    "lng": -86.7816,
+    "source": "fallback",
+    "raw_place": "Nashville",
+    "raw_state": "TN"
+  },
+  {
+    "city": "Austin",
+    "state": "TX",
+    "pop_2024": 100000,
+    "lat": 30.2672,
+    "lng": -97.7431,
+    "source": "fallback",
+    "raw_place": "Austin",
+    "raw_state": "TX"
+  },
+  {
+    "city": "Corpus Christi",
+    "state": "TX",
+    "pop_2024": 100000,
+    "lat": 27.8006,
+    "lng": -97.3964,
+    "source": "fallback",
+    "raw_place": "Corpus Christi",
+    "raw_state": "TX"
+  },
+  {
+    "city": "Dallas",
+    "state": "TX",
+    "pop_2024": 100000,
+    "lat": 32.7767,
+    "lng": -96.797,
+    "source": "fallback",
+    "raw_place": "Dallas",
+    "raw_state": "TX"
+  },
+  {
+    "city": "El Paso",
+    "state": "TX",
+    "pop_2024": 100000,
+    "lat": 31.7619,
+    "lng": -106.485,
+    "source": "fallback",
+    "raw_place": "El Paso",
+    "raw_state": "TX"
+  },
+  {
+    "city": "Fort Worth",
+    "state": "TX",
+    "pop_2024": 100000,
+    "lat": 32.7555,
+    "lng": -97.3308,
+    "source": "fallback",
+    "raw_place": "Fort Worth",
+    "raw_state": "TX"
+  },
+  {
+    "city": "Houston",
+    "state": "TX",
+    "pop_2024": 100000,
+    "lat": 29.7604,
+    "lng": -95.3698,
+    "source": "fallback",
+    "raw_place": "Houston",
+    "raw_state": "TX"
+  },
+  {
+    "city": "Lubbock",
+    "state": "TX",
+    "pop_2024": 100000,
+    "lat": 33.5779,
+    "lng": -101.8552,
+    "source": "fallback",
+    "raw_place": "Lubbock",
+    "raw_state": "TX"
+  },
+  {
+    "city": "San Antonio",
+    "state": "TX",
+    "pop_2024": 100000,
+    "lat": 29.4241,
+    "lng": -98.4936,
+    "source": "fallback",
+    "raw_place": "San Antonio",
+    "raw_state": "TX"
+  },
+  {
+    "city": "Salt Lake City",
+    "state": "UT",
+    "pop_2024": 100000,
+    "lat": 40.7608,
+    "lng": -111.891,
+    "source": "fallback",
+    "raw_place": "Salt Lake City",
+    "raw_state": "UT"
+  },
+  {
+    "city": "Norfolk",
+    "state": "VA",
+    "pop_2024": 100000,
+    "lat": 36.8508,
+    "lng": -76.2859,
+    "source": "fallback",
+    "raw_place": "Norfolk",
+    "raw_state": "VA"
+  },
+  {
+    "city": "Richmond",
+    "state": "VA",
+    "pop_2024": 100000,
+    "lat": 37.5407,
+    "lng": -77.436,
+    "source": "fallback",
+    "raw_place": "Richmond",
+    "raw_state": "VA"
+  },
+  {
+    "city": "Virginia Beach",
+    "state": "VA",
+    "pop_2024": 100000,
+    "lat": 36.8529,
+    "lng": -75.978,
+    "source": "fallback",
+    "raw_place": "Virginia Beach",
+    "raw_state": "VA"
+  },
+  {
+    "city": "Burlington",
+    "state": "VT",
+    "pop_2024": 100000,
+    "lat": 44.4759,
+    "lng": -73.2121,
+    "source": "fallback",
+    "raw_place": "Burlington",
+    "raw_state": "VT"
+  },
+  {
+    "city": "Seattle",
+    "state": "WA",
+    "pop_2024": 100000,
+    "lat": 47.6062,
+    "lng": -122.3321,
+    "source": "fallback",
+    "raw_place": "Seattle",
+    "raw_state": "WA"
+  },
+  {
+    "city": "Spokane",
+    "state": "WA",
+    "pop_2024": 100000,
+    "lat": 47.6588,
+    "lng": -117.426,
+    "source": "fallback",
+    "raw_place": "Spokane",
+    "raw_state": "WA"
+  },
+  {
+    "city": "Tacoma",
+    "state": "WA",
+    "pop_2024": 100000,
+    "lat": 47.2529,
+    "lng": -122.4443,
+    "source": "fallback",
+    "raw_place": "Tacoma",
+    "raw_state": "WA"
+  },
+  {
+    "city": "Green Bay",
+    "state": "WI",
+    "pop_2024": 100000,
+    "lat": 44.5133,
+    "lng": -88.0133,
+    "source": "fallback",
+    "raw_place": "Green Bay",
+    "raw_state": "WI"
+  },
+  {
+    "city": "Madison",
+    "state": "WI",
+    "pop_2024": 100000,
+    "lat": 43.0731,
+    "lng": -89.4012,
+    "source": "fallback",
+    "raw_place": "Madison",
+    "raw_state": "WI"
+  },
+  {
+    "city": "Milwaukee",
+    "state": "WI",
+    "pop_2024": 100000,
+    "lat": 43.0389,
+    "lng": -87.9065,
+    "source": "fallback",
+    "raw_place": "Milwaukee",
+    "raw_state": "WI"
+  },
+  {
+    "city": "Casper",
+    "state": "WY",
+    "pop_2024": 100000,
+    "lat": 42.8501,
+    "lng": -106.3252,
+    "source": "fallback",
+    "raw_place": "Casper",
+    "raw_state": "WY"
+  },
+  {
+    "city": "Cheyenne",
+    "state": "WY",
+    "pop_2024": 100000,
+    "lat": 41.139981,
+    "lng": -104.820246,
+    "source": "fallback",
+    "raw_place": "Cheyenne",
+    "raw_state": "WY"
+  }
+]

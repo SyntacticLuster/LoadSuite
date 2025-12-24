@@ -133,8 +133,36 @@ def _build_default_ctx() -> AppContext:
         except Exception:
             seed_val = None
 
+    # Prefer loading a committed static synthetic dataset when available. This
+    # ensures the dataset is stable and never implicitly regenerated.
+    synthetic_file = BASE_DIR / settings.synthetic_dataset_path
+    if synthetic_file.exists():
+        from .data import load_dataset_from_file
+
+        try:
+            dataset = load_dataset_from_file(synthetic_file)
+        except Exception:
+            logger.exception("Failed to load synthetic dataset from %s", synthetic_file)
+            # Fall back to existing behavior to avoid startup failure in dev mode
+            dataset = get_synthetic_dataset(settings.synthetic_load_count, seed=seed_val)
+    else:
+        # If a committed static dataset isn't present, preserve previous behavior
+        # and generate a synthetic dataset according to settings. This path does
+        # NOT regenerate a committed static dataset automatically.
+        if settings.generate_synthetic_loads:
+            dataset = get_synthetic_dataset(settings.synthetic_load_count, seed=seed_val)
+        else:
+            # Fall back to small sample file if available
+            sample_path = BASE_DIR / "sample_data" / "sample_loads.json"
+            from .data import load_dataset_from_file
+
+            if sample_path.exists():
+                dataset = load_dataset_from_file(sample_path)
+            else:
+                dataset = get_synthetic_dataset(settings.synthetic_load_count, seed=seed_val)
+
     return AppContext(
-        dataset=get_synthetic_dataset(settings.synthetic_load_count, seed=seed_val),
+        dataset=dataset,
         scoring_engine=ScoringEngine(),
         scoring_service=None,
         routecast_client=None,
@@ -665,6 +693,47 @@ def _convert_prefs_to_user_prefs(prefs: PreferencesModel) -> UserPreferences:
     )
 
 
+def _greenlight_criteria_active(prefs: PreferencesModel) -> bool:
+    return any([
+        prefs.min_rpm is not None,
+        prefs.max_deadhead_miles is not None,
+        prefs.max_weight_lbs is not None,
+        prefs.min_weight_lbs is not None,
+        prefs.min_broker_rating is not None,
+        bool(prefs.equipment_types),
+        prefs.detention is not None,
+        prefs.hazmat is not None,
+        prefs.multi_stop is not None,
+    ])
+
+
+def _meets_greenlight_criteria(load: Load, prefs: PreferencesModel) -> bool:
+    if not _greenlight_criteria_active(prefs):
+        return False
+
+    if prefs.min_rpm is not None and load.rpm < prefs.min_rpm:
+        return False
+    if prefs.max_deadhead_miles is not None and load.deadhead_miles > prefs.max_deadhead_miles:
+        return False
+    if prefs.max_weight_lbs is not None and load.weight_lbs > prefs.max_weight_lbs:
+        return False
+    if prefs.min_weight_lbs is not None and load.weight_lbs < prefs.min_weight_lbs:
+        return False
+    if prefs.min_broker_rating is not None and load.broker.rating < prefs.min_broker_rating:
+        return False
+    if prefs.equipment_types:
+        if load.equipment not in prefs.equipment_types:
+            return False
+    if prefs.detention is not None and load.detention is not prefs.detention:
+        return False
+    if prefs.hazmat is not None and load.hazmat is not prefs.hazmat:
+        return False
+    if prefs.multi_stop is not None and load.multi_stop is not prefs.multi_stop:
+        return False
+
+    return True
+
+
 def _factor_to_model(factor) -> FactorResultModel:
     """Convert scoring FactorResult to API model."""
     return FactorResultModel(
@@ -737,13 +806,12 @@ def list_scored_loads(
     )
     now = datetime.now(timezone.utc)
     filtered = apply_filters(_active_loads(ctx), query)
+    total_filtered = len(filtered)
     loads_for_scoring = filtered if sort == "score_desc" else apply_sort(filtered, query, now)[:limit]
     
     # Get user preferences for scoring
     prefs_model, _ = ctx.preferences_store.get(user_id)
     user_prefs = _convert_prefs_to_user_prefs(prefs_model)
-    greenlight_threshold = prefs_model.greenlight_threshold or 70.0
-
     scored_loads: List[ScoredLoadModel] = []
     allow_routecast = include_routecast and settings.routecast_enabled and routecast_client is not None
     max_routecast = 25
@@ -777,7 +845,7 @@ def list_scored_loads(
             top_reasons=[_factor_to_model(f) for f in composite.top_reasons[:3]],
             factors=[_factor_to_model(f) for f in composite.factors],
             confidence=composite.confidence,
-            greenlight=composite.score >= greenlight_threshold,
+            greenlight=_meets_greenlight_criteria(load, prefs_model),
             routecast=routecast,
         ))
     
@@ -785,7 +853,7 @@ def list_scored_loads(
         scored_loads.sort(key=lambda s: s.score, reverse=True)
         scored_loads = scored_loads[:limit]
 
-    return ScoredLoadsResponse(total=len(scored_loads), loads=scored_loads)
+    return ScoredLoadsResponse(total=total_filtered, loads=scored_loads)
 
 
 @app.get("/api/loads/{load_id}/score")
@@ -806,8 +874,6 @@ def get_load_score(
     
     prefs_model, _ = ctx.preferences_store.get(user_id)
     user_prefs = _convert_prefs_to_user_prefs(prefs_model)
-    greenlight_threshold = prefs_model.greenlight_threshold or 70.0
-    
     now = datetime.now(timezone.utc)
     composite = scoring.score(load, preferences=user_prefs, now=now)
     
@@ -817,7 +883,7 @@ def get_load_score(
         top_reasons=[_factor_to_model(f) for f in composite.top_reasons[:3]],
         factors=[_factor_to_model(f) for f in composite.factors],
         confidence=composite.confidence,
-        greenlight=composite.score >= greenlight_threshold,
+        greenlight=_meets_greenlight_criteria(load, prefs_model),
     )
 
 
@@ -920,17 +986,27 @@ def get_routecast(load_id: str, ctx: AppContext = Depends(get_ctx)) -> dict[str,
 def refresh(ctx: AppContext = Depends(get_ctx), req: RefreshRequest = RefreshRequest()) -> dict[str, Any]:
     """Refresh synthetic dataset on-demand.
 
-    If SYNTHETIC_SEED is set, the seeded dataset is used (deterministic).
-    Otherwise a fresh RNG is used and the cache entry for (count, None) is replaced
-    so repeated refreshes produce new random datasets.
+    By default, this endpoint is disabled (returns 403) to protect the committed
+    static dataset; enable by setting ALLOW_SYNTH_REFRESH=1 (or using the
+    equivalent environment var). When enabled, refresh is deterministic when a
+    seed is provided (either via SYNTHETIC_SEED env var or `seed` in the request).
     """
-    seed_raw = os.environ.get("SYNTHETIC_SEED")
-    seed_val = None
-    if seed_raw is not None:
-        try:
-            seed_val = int(seed_raw)
-        except Exception:
-            seed_val = None
+    # Gate by config flag
+    if not settings.allow_synth_refresh:
+        return JSONResponse(
+            status_code=403,
+            content={"ok": False, "error": "Synthetic regeneration disabled. Dataset is static (6769 loads)."},
+        )
+
+    # Respect explicit seed from request first, then SYNTHETIC_SEED env var.
+    seed_val = req.seed
+    if seed_val is None:
+        seed_raw = os.environ.get("SYNTHETIC_SEED")
+        if seed_raw is not None:
+            try:
+                seed_val = int(seed_raw)
+            except Exception:
+                seed_val = None
 
     if seed_val is None:
         # Force generate a fresh, non-deterministic dataset and update cache.

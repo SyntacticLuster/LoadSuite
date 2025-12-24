@@ -68,6 +68,22 @@ class TestScoredLoadsEndpoint:
         for item in data["loads"]:
             assert item["load"]["equipment"] == "Dry Van"
 
+    def test_scored_loads_greenlight_respects_preferences(self):
+        """GreenLight should only apply when user criteria are met."""
+        user_id = "test-greenlight-criteria"
+        response = client.put(
+            "/api/preferences",
+            params={"user_id": user_id},
+            json={"min_rpm": 10.0},
+        )
+        assert response.status_code == 200
+
+        response = client.get("/api/loads/scored", params={"user_id": user_id, "limit": 50})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["loads"]
+        assert all(not item["greenlight"] for item in data["loads"])
+
     def test_individual_load_score(self):
         """Verify individual load score endpoint."""
         # First get a load ID
@@ -112,6 +128,9 @@ class TestPreferencesEndpoint:
             "min_rpm": 2.50,
             "max_deadhead_miles": 150,
             "equipment_types": ["Dry Van", "Reefer"],
+            "detention": True,
+            "hazmat": False,
+            "multi_stop": True,
         }
         
         # Set preferences
@@ -124,6 +143,9 @@ class TestPreferencesEndpoint:
         data = response.json()
         assert data["preferences"]["min_rpm"] == 2.50
         assert data["preferences"]["max_deadhead_miles"] == 150
+        assert data["preferences"]["detention"] is True
+        assert data["preferences"]["hazmat"] is False
+        assert data["preferences"]["multi_stop"] is True
 
 
 class TestWatchlistEndpoint:
@@ -312,10 +334,30 @@ class TestExistingEndpointsNotBroken:
         assert response.json()["id"] == load_id
 
     def test_refresh_endpoint(self):
-        """Verify /api/refresh works."""
+        """Verify /api/refresh is gated by config and works when enabled."""
+        # Default: refresh is disabled and should return 403
         response = client.post("/api/refresh", json={"count": 50})
-        assert response.status_code == 200
-        assert response.json()["ok"] is True
+        assert response.status_code == 403
+        assert response.json().get("ok") is False
+
+        # Enable refresh dynamically and verify it succeeds (deterministic with seed).
+        # Use a fresh TestClient context so the mutated dataset does not leak into
+        # other tests (each context runs the lifespan handler).
+        from app.config import settings
+
+        settings.allow_synth_refresh = True
+        try:
+            from fastapi.testclient import TestClient
+
+            # Ensure the lifespan handler will rebuild the AppContext (avoid using
+            # any previously mutated ctx).
+            app.state.ctx = None
+            with TestClient(app) as c2:
+                response2 = c2.post("/api/refresh", json={"count": 50, "seed": 12345})
+                assert response2.status_code == 200
+                assert response2.json()["ok"] is True
+        finally:
+            settings.allow_synth_refresh = False
 
     def test_news_endpoint(self):
         """Verify /api/news works."""

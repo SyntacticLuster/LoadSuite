@@ -509,7 +509,7 @@ const renderWeatherSidebar = () => {
           "button",
           {
             class:
-              "rounded-md border border-emerald-500 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/40",
+              "rounded-md border border-sky-500 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/40",
             title: isCollapsed ? "Show" : "Hide",
             "aria-label": isCollapsed ? "Show" : "Hide",
             onclick: () => {
@@ -526,7 +526,7 @@ const renderWeatherSidebar = () => {
           "button",
           {
             class:
-              "rounded-md border border-emerald-500 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/40",
+              "rounded-md border border-sky-500 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/40",
             title: "Change ZIP code",
             "aria-label": "Change ZIP code",
             onclick: () => applyZipFromPrompt(),
@@ -679,9 +679,9 @@ const renderWeatherSidebar = () => {
   const routecastWidget = renderRouteCastWidget(state.lastSelectedLoadId, { compact: true });
 
   return el("div", { class: "space-y-3 lg:w-80 lg:flex-shrink-0 lg:sticky lg:top-16 lg:self-start" }, [
-    forecastWidget,
-    alertsWidget,
     routecastWidget,
+    alertsWidget,
+    forecastWidget,
   ]);
 };
 
@@ -767,7 +767,7 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
         "button",
         {
           class:
-            "rounded-md border border-emerald-500 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/40",
+            "rounded-md border border-sky-500 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/40",
           title: isCollapsed ? "Show" : "Hide",
           "aria-label": isCollapsed ? "Show" : "Hide",
           onclick: () => {
@@ -942,6 +942,44 @@ const fetchWatchlist = async () => {
   }
 };
 
+const watchlistSummaryText = (count) =>
+  count > 0
+    ? `${count} load${count > 1 ? "s" : ""} watched. Toggle ☆ on any load card.`
+    : "No loads watched yet. Click ☆ on a load card to add.";
+
+const watchlistListBtnClass = (isWatched) =>
+  `text-lg leading-none transition ${isWatched ? "text-amber-400" : "text-slate-400 hover:text-amber-400"}`;
+
+const watchlistDetailBtnClass = (isWatched) =>
+  `rounded-md px-3 py-2 text-sm font-medium ${
+    isWatched
+      ? "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+      : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+  }`;
+
+const updateWatchlistSummary = () => {
+  const summary = document.querySelector("[data-watchlist-summary]");
+  if (!summary) return;
+  summary.textContent = watchlistSummaryText(state.watchlist.size);
+};
+
+const updateWatchlistButtons = (loadId) => {
+  const isWatched = state.watchlist.has(loadId);
+  const buttons = document.querySelectorAll(`button[data-watchlist-id="${loadId}"]`);
+  buttons.forEach((btn) => {
+    const variant = btn.getAttribute("data-watchlist-variant");
+    if (variant === "detail") {
+      btn.className = watchlistDetailBtnClass(isWatched);
+      btn.textContent = isWatched ? "★ Watching" : "☆ Add to Watchlist";
+      return;
+    }
+    btn.className = watchlistListBtnClass(isWatched);
+    btn.setAttribute("title", isWatched ? "Remove from watchlist" : "Add to watchlist");
+    btn.textContent = isWatched ? "★" : "☆";
+  });
+  updateWatchlistSummary();
+};
+
 const toggleWatchlist = async (loadId) => {
   try {
     if (state.watchlist.has(loadId)) {
@@ -956,7 +994,7 @@ const toggleWatchlist = async (loadId) => {
       await apiPostJson("/api/watchlist", { item_type: "load", load_id: loadId });
       state.watchlist.add(loadId);
     }
-    render();
+    updateWatchlistButtons(loadId);
   } catch (err) {
     console.error("Failed to toggle watchlist:", err);
   }
@@ -1154,6 +1192,32 @@ const parseOptionalNumber = (raw) => {
   if (!s) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
+};
+
+const _parseOptionalBool = (raw) => {
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  return null;
+};
+
+const buildPreferencesPayload = (prefs) => ({
+  min_rpm: parseOptionalNumber(prefs.rpm_min),
+  max_deadhead_miles: parseOptionalNumber(prefs.deadhead_max),
+  max_weight_lbs: parseOptionalNumber(prefs.weight_max),
+  min_weight_lbs: parseOptionalNumber(prefs.weight_min),
+  min_broker_rating: parseOptionalNumber(prefs.broker_rating_min),
+  equipment_types: prefs.equipment ? [prefs.equipment] : null,
+  detention: _parseOptionalBool(prefs.detention),
+  hazmat: _parseOptionalBool(prefs.hazmat),
+  multi_stop: _parseOptionalBool(prefs.multi_stop),
+});
+
+const syncPreferences = async (prefs) => {
+  try {
+    await apiPut("/api/preferences", buildPreferencesPayload(prefs));
+  } catch (err) {
+    console.error("Failed to sync preferences:", err);
+  }
 };
 
 const prefStatus = (load) => {
@@ -1387,7 +1451,7 @@ const renderList = async (root) => {
       "button",
       {
         class:
-          "shrink-0 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+          "shrink-0 rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
         onclick: () => render(),
       },
       ["Search"]
@@ -1398,7 +1462,7 @@ const renderList = async (root) => {
     "button",
     {
       class:
-        "flex-1 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+        "flex-1 rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-left text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
       onclick: () => {
         state.filtersOpen = !state.filtersOpen;
         render();
@@ -1413,7 +1477,7 @@ const renderList = async (root) => {
     "button",
     {
       class:
-        "flex-1 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-left text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+        "flex-1 rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-left text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
       onclick: async () => {
         state.terminalPanelOpen = !state.terminalPanelOpen;
         if (state.terminalPanelOpen) {
@@ -1449,7 +1513,7 @@ const renderList = async (root) => {
       "select",
       {
         class:
-          "rounded-md border border-emerald-500 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+          "rounded-md border border-sky-500 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
         onchange: async (e) => {
           state.query.sort = e.target.value;
           await render();
@@ -1461,7 +1525,7 @@ const renderList = async (root) => {
           {
             value: o.value,
             class:
-              "bg-slate-200 text-emerald-800 dark:bg-slate-800 dark:text-emerald-300",
+              "bg-slate-200 text-sky-800 dark:bg-slate-800 dark:text-sky-300",
           },
           [o.label]
         )
@@ -1487,20 +1551,31 @@ const renderList = async (root) => {
   ]);
   top.appendChild(listWrap);
   main.appendChild(top);
-  if (sidebar) layout.appendChild(sidebar);
   layout.appendChild(main);
+  if (sidebar) layout.appendChild(sidebar);
   root.appendChild(layout);
 
-  // Fetch scored loads for score display
-  await fetchScoredLoads();
   await fetchWatchlist();
   await fetchFilterPresets();
 
-  const data = await apiGet(`/api/loads${buildQueryString()}`);
+  const qs = buildQueryString();
+  const limitParam = qs ? `${qs}&limit=200` : "?limit=200";
+  const data = await apiGet(`/api/loads/scored${limitParam}`);
   listWrap.appendChild(el("div", { class: "text-xs text-slate-600 dark:text-slate-400 pt-2" }, [`${data.total} loads`]))
 
   const ul = el("div", { class: "grid grid-cols-1 gap-2 pt-2 lg:grid-cols-2" });
-  const availableLoads = Array.isArray(data.loads) ? data.loads : [];
+  const scoredItems = Array.isArray(data.loads) ? data.loads : [];
+  state.scoredLoads = {};
+  for (const item of scoredItems) {
+    if (!item?.load?.id) continue;
+    state.scoredLoads[item.load.id] = {
+      score: item.score,
+      greenlight: item.greenlight,
+      top_reasons: item.top_reasons || [],
+      confidence: item.confidence,
+    };
+  }
+  const availableLoads = scoredItems.map((item) => item.load).filter(Boolean);
   state.latestLoads = availableLoads;
   _updateGreenlightTicker(state.latestLoads);
   const loads = availableLoads.slice(0, 200);
@@ -1515,15 +1590,15 @@ const renderList = async (root) => {
   for (const load of sortedLoads) {
     const { rpmOk, equipmentOk, weightOk, detentionOk } = prefStatus(load);
     const greenlightActive = hasActivePrefs();
-    const greenlightOk = greenlightActive ? isGreenLight(load) : false;
-
-    // Color semantics: reserve green for the GreenLight verdict.
-    // Use a more blue-leaning accent for informational/pass indicators.
-    const okTextClass = "text-sky-600 dark:text-sky-400";
 
     // Get score data if available
     const scoreData = state.scoredLoads[load.id];
     const hasScore = !!scoreData;
+    const greenlightOk = greenlightActive && isGreenLight(load);
+
+    // Color semantics: reserve green for the GreenLight verdict.
+    // Use a more blue-leaning accent for informational/pass indicators.
+    const okTextClass = "text-sky-600 dark:text-sky-400";
     const scoreValue = hasScore ? scoreData.score : null;
     const isWatched = state.watchlist.has(load.id);
 
@@ -1532,19 +1607,12 @@ const renderList = async (root) => {
       return ok ? okTextClass : "text-red-600 dark:text-red-400";
     };
 
-    const rpmTone = (() => {
-      if (rpmOk === false) return "text-red-600 dark:text-red-400";
-      if (rpmOk === true) return okTextClass;
-      return "text-slate-600 dark:text-slate-400";
-    })();
-    const rpmClass = `text-xs ${rpmTone}`;
+    const rpmClass = "text-xs text-slate-700 dark:text-slate-300";
     const equipClass = maybeClass(equipmentOk, "");
     const weightClass = maybeClass(weightOk, "");
     const detentionClass = maybeClass(detentionOk, "");
-    const payClass = greenlightOk ? "text-sm font-semibold text-green-600 dark:text-green-400" : "text-sm font-semibold";
-    const routeClass = greenlightOk
-      ? "text-sm font-semibold text-green-400 dark:text-green-300"
-      : "text-sm font-semibold text-slate-900 dark:text-slate-100";
+    const payClass = "text-sm font-semibold text-slate-700 dark:text-slate-300";
+    const routeClass = "text-sm font-semibold text-slate-900 dark:text-slate-100";
 
     // Build score + verdict badges (neutral pill; green tint only when endorsed)
     const scoreBadge = hasScore
@@ -1558,7 +1626,7 @@ const renderList = async (root) => {
             }`,
             title: buildScoreTooltip(scoreValue, greenlightOk, load),
           },
-          [`${scoreValue.toFixed(0)}`]
+          [`${scoreValue.toFixed(1)}`]
         )
       : null;
 
@@ -1617,7 +1685,7 @@ const renderList = async (root) => {
               children.push(el("span", { class: "px-1 text-slate-400 dark:text-slate-500" }, ["•"]));
             }
           });
-          return el("div", { class: "pt-1 text-xs truncate" }, children);
+          return el("div", { class: "text-xs truncate" }, children);
         })()
       : null;
 
@@ -1625,8 +1693,10 @@ const renderList = async (root) => {
     const watchlistBtn = el(
       "button",
       {
-        class: `ml-2 text-lg leading-none transition ${isWatched ? "text-amber-400" : "text-slate-400 hover:text-amber-400"}`,
+        class: watchlistListBtnClass(isWatched),
         title: isWatched ? "Remove from watchlist" : "Add to watchlist",
+        "data-watchlist-id": load.id,
+        "data-watchlist-variant": "list",
         onclick: (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -1643,48 +1713,65 @@ const renderList = async (root) => {
         onclick: () => setLastSelectedLoadId(load.id),
         class:
           [
-            "block rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800",
+            "block rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 relative",
+            "min-h-[130px]",
             state.uiPrefs.greenlight_full_row && greenlightOk ? "lg:col-span-2" : "",
           ]
             .filter(Boolean)
             .join(" "),
       },
       [
+        // Header: left = route, right = vertical stack (score + price + $/mi) + watch star
         el("div", { class: "flex items-start justify-between gap-2" }, [
-          el("div", { class: "flex items-center gap-2" }, [
-            el("div", { class: routeClass }, [
-              `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
+          // Left: route + load info stack
+          el("div", { class: "min-w-0 flex-1" }, [
+            el("div", { class: "flex items-center gap-2" }, [
+              el("div", { class: routeClass }, [
+                `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
+              ]),
             ]),
-            scoreCluster,
+            topReasons ? el("div", { class: "pt-1" }, [topReasons]) : null,
+            el("div", { class: "mt-2" }, [
+              el("div", { class: "text-xs text-slate-700 dark:text-slate-300" }, [
+                el("span", { class: equipClass }, [load.equipment]),
+                " • ",
+                `${fmtNum(load.distance_miles)} mi • deadhead ${fmtNum(load.deadhead_miles)} mi • `,
+                el("span", { class: weightClass }, [`${load.weight_lbs} lbs`]),
+              ]),
+              el(
+                "div",
+                { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" },
+                [
+                  el("div", { class: "min-w-0" }, [
+                    `Broker: ${load.broker.name} (${fmtNum(load.broker.rating, 1)})`,
+                    load.hazmat ? " • Hazmat" : "",
+                    load.detention ? " • " : "",
+                    load.detention ? el("span", { class: detentionClass }, ["Detention"]) : "",
+                    load.multi_stop ? " • Multi-stop" : "",
+                    load.lane_history ? " • Lane history" : "",
+                  ]),
+                ]
+              ),
+            ]),
           ].filter(Boolean)),
-          el("div", { class: "flex items-center text-right" }, [
-            el("div", {}, [
-              el("div", { class: payClass }, [fmtMoney(load.rate_total_usd)]),
-              el("div", { class: rpmClass }, [`$${fmtNum(load.rpm, 2)}/mi`]),
-            ]),
-            watchlistBtn,
+
+          // Right: score/price at top, watchlist star anchored bottom-right
+          el("div", { class: "flex flex-col items-end justify-between self-stretch text-right" }, [
+            el("div", { class: "flex flex-col items-end gap-1" }, [
+              // Score cluster (if present) will appear at the top of this stack
+              scoreCluster,
+              // Price (preserve existing styling)
+              el("div", {}, [
+                el("div", { class: payClass }, [fmtMoney(load.rate_total_usd)]),
+                el("div", { class: rpmClass }, [`$${fmtNum(load.rpm, 2)}/mi`]),
+              ]),
+            ].filter(Boolean)),
           ]),
-        ]),
-        topReasons,
-        el("div", { class: "pt-1 text-xs text-slate-700 dark:text-slate-300" }, [
-          el("span", { class: equipClass }, [load.equipment]),
-          " • ",
-          `${fmtNum(load.distance_miles)} mi • deadhead ${fmtNum(load.deadhead_miles)} mi • `,
-          el("span", { class: weightClass }, [`${load.weight_lbs} lbs`]),
         ]),
         el(
           "div",
-          { class: "pt-1 text-xs text-slate-600 dark:text-slate-400 flex items-end justify-between gap-3" },
-          [
-            el("div", { class: "min-w-0" }, [
-              `Broker: ${load.broker.name} (${fmtNum(load.broker.rating, 1)})`,
-              load.hazmat ? " • Hazmat" : "",
-              load.detention ? " • " : "",
-              load.detention ? el("span", { class: detentionClass }, ["Detention"]) : "",
-              load.multi_stop ? " • Multi-stop" : "",
-              load.lane_history ? " • Lane history" : "",
-            ]),
-          ]
+          { class: "absolute bottom-3 right-3" },
+          [watchlistBtn]
         ),
       ]
     );
@@ -1829,9 +1916,10 @@ const renderPrefsPanel = () => {
     "button",
     {
       class:
-        "mt-3 w-full flex items-center justify-center gap-2 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
-      onclick: () => {
+        "mt-3 w-full flex items-center justify-center gap-2 rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
+      onclick: async () => {
         state.prefs = { ...state.prefsDraft };
+        await syncPreferences(state.prefs);
         render();
       },
     },
@@ -1845,9 +1933,10 @@ const renderPrefsPanel = () => {
       class:
         "mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
       title: "Save these GreenLight parameters as the default on this device",
-      onclick: () => {
+      onclick: async () => {
         state.prefs = { ...state.prefsDraft };
         setGreenLightDefaults(state.prefs);
+        await syncPreferences(state.prefs);
         render();
       },
     },
@@ -1861,10 +1950,11 @@ const renderPrefsPanel = () => {
       class:
         "mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
       title: "Clear saved GreenLight defaults and reset parameters",
-      onclick: () => {
+      onclick: async () => {
         clearGreenLightDefaults();
         state.prefs = { ...DEFAULT_PREFS };
         state.prefsDraft = { ...DEFAULT_PREFS };
+        await syncPreferences(state.prefs);
         render();
       },
     },
@@ -1878,13 +1968,13 @@ const renderPrefsPanel = () => {
 const renderTerminalPanel = () => {
   const wrap = el("div", {
     class:
-      "rounded-lg border border-emerald-500 bg-emerald-50 p-3 dark:border-emerald-600 dark:bg-emerald-900/20 space-y-4",
+      "rounded-lg border border-sky-500 bg-sky-50 p-3 dark:border-sky-600 dark:bg-sky-900/20 space-y-4",
   });
 
   // Section: Save Filter Preset
   const presetSection = el("div", { class: "space-y-2" });
   presetSection.appendChild(
-    el("div", { class: "text-sm font-semibold text-emerald-700 dark:text-emerald-400" }, ["💾 Save Filter Preset"])
+    el("div", { class: "text-sm font-semibold text-sky-700 dark:text-sky-400" }, ["💾 Save Filter Preset"])
   );
 
   let presetNameInput;
@@ -1898,7 +1988,7 @@ const renderTerminalPanel = () => {
       "button",
       {
         class:
-          "shrink-0 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+          "shrink-0 rounded-md border border-sky-500 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
         onclick: () => {
           const name = presetNameInput.value.trim();
           if (name) {
@@ -1923,7 +2013,7 @@ const renderTerminalPanel = () => {
             "button",
             {
               class:
-                "ml-1 rounded border border-emerald-500 bg-emerald-50 px-2 py-0.5 text-[0.7rem] font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+                "ml-1 rounded border border-sky-500 bg-sky-50 px-2 py-0.5 text-[0.7rem] font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
               title: "Apply preset and run Search",
               onclick: () => loadFilterPreset(preset),
             },
@@ -1947,15 +2037,15 @@ const renderTerminalPanel = () => {
   // Section: Watchlist summary
   const watchlistSection = el("div", { class: "space-y-2" });
   watchlistSection.appendChild(
-    el("div", { class: "text-sm font-semibold text-emerald-700 dark:text-emerald-400" }, ["👁️ Watchlist"])
+    el("div", { class: "text-sm font-semibold text-sky-700 dark:text-sky-400" }, ["👁️ Watchlist"])
   );
   const watchCount = state.watchlist.size;
   watchlistSection.appendChild(
-    el("div", { class: "text-xs text-slate-600 dark:text-slate-400" }, [
-      watchCount > 0
-        ? `${watchCount} load${watchCount > 1 ? "s" : ""} watched. Toggle ☆ on any load card.`
-        : "No loads watched yet. Click ☆ on a load card to add.",
-    ])
+    el(
+      "div",
+      { class: "text-xs text-slate-600 dark:text-slate-400", "data-watchlist-summary": "true" },
+      [watchlistSummaryText(watchCount)]
+    )
   );
 
   watchlistSection.appendChild(
@@ -1963,7 +2053,7 @@ const renderTerminalPanel = () => {
       "button",
       {
         class:
-          "w-full rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+          "w-full rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
         title: "Fetch scores for watched loads and show the top 5",
         onclick: async () => {
           await runWatchlistSweep();
@@ -2007,7 +2097,7 @@ const renderTerminalPanel = () => {
   // Section: Alerts placeholder
   const alertsSection = el("div", { class: "space-y-2" });
   alertsSection.appendChild(
-    el("div", { class: "text-sm font-semibold text-emerald-700 dark:text-emerald-400" }, ["🔔 Alerts"])
+    el("div", { class: "text-sm font-semibold text-sky-700 dark:text-sky-400" }, ["🔔 Alerts"])
   );
 
   let alertNameInput;
@@ -2019,13 +2109,13 @@ const renderTerminalPanel = () => {
         placeholder: "Alert name (uses current filters)…",
       })),
       el(
-        "button",
-        {
-          class:
-            "shrink-0 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
-          onclick: async () => {
-            const name = alertNameInput.value.trim();
-            if (!name) return;
+      "button",
+      {
+        class:
+          "shrink-0 rounded-md border border-sky-500 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
+        onclick: async () => {
+          const name = alertNameInput.value.trim();
+          if (!name) return;
             await createAlertFromFilters(name);
             alertNameInput.value = "";
           },
@@ -2192,13 +2282,13 @@ const renderFiltersPanel = () => {
   wrap.appendChild(
     el("div", { class: "pt-3" }, [
       el(
-        "button",
-        {
-          class:
-            "w-full rounded-md border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
-          onclick: () => render(),
-        },
-        ["Apply"]
+      "button",
+      {
+        class:
+          "w-full rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
+        onclick: () => render(),
+      },
+      ["Apply"]
       ),
     ])
   );
@@ -2342,11 +2432,9 @@ const renderDetail = async (root, id) => {
   const watchlistBtn = el(
     "button",
     {
-      class: `rounded-md px-3 py-2 text-sm font-medium ${
-        isWatched
-          ? "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
-          : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
-      }`,
+      class: watchlistDetailBtnClass(isWatched),
+      "data-watchlist-id": id,
+      "data-watchlist-variant": "detail",
       onclick: () => toggleWatchlist(id),
     },
     [isWatched ? "★ Watching" : "☆ Add to Watchlist"]
@@ -2578,7 +2666,7 @@ const _buildTickerEntry = (item) => {
   const timeLabel = _formatTickerTime(item.published);
   const badge = el(
     "span",
-    { class: "flex-shrink-0 text-[0.55rem] font-semibold tracking-[0.35em] text-emerald-200" },
+    { class: "flex-shrink-0 text-[0.55rem] font-semibold tracking-[0.35em] text-sky-200" },
     [item.source || "News"]
   );
   const title = el(
@@ -2648,7 +2736,7 @@ const _updateGreenlightTicker = (loads = []) => {
             "a",
             {
               href: `${appBasePath}#/load/${load.id}`,
-              class: "text-[0.75rem] font-semibold tracking-wide text-emerald-400 transition hover:text-emerald-100",
+              class: "text-[0.75rem] font-semibold tracking-wide text-slate-400 transition hover:text-slate-200",
             },
             [`${route} • ${fmtMoney(load.rate_total_usd)}`]
           );
@@ -2708,6 +2796,7 @@ state.lastSelectedLoadId = getLastSelectedLoadId();
   if (defaults) state.prefs = { ...state.prefs, ...defaults };
   state.prefsDraft = { ...state.prefs };
 }
+syncPreferences(state.prefs);
 {
   const defaults = getFilterDefaults();
   if (defaults) state.query = { ...DEFAULT_QUERY, ...defaults, q: "" };

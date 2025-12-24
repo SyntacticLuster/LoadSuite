@@ -1,6 +1,6 @@
 # LoadSuite cPanel Deployment Guide
 
-This guide walks you through deploying LoadSuite to a cPanel shared hosting environment with PostgreSQL.
+This guide walks you through deploying LoadSuite to a cPanel shared hosting environment with MySQL.
 
 ## Prerequisites
 
@@ -10,11 +10,11 @@ This guide walks you through deploying LoadSuite to a cPanel shared hosting envi
 
 ---
 
-## Step 1: Create PostgreSQL Database in cPanel
+## Step 1: Create MySQL Database in cPanel
 
 1. **Log into cPanel** at `https://orbitsuite.cloud/cpanel` (or your host's cPanel URL)
 
-2. **Navigate to Databases → PostgreSQL Databases**
+2. **Navigate to Databases → MySQL® Databases**
 
 3. **Create a new database:**
    - Database name: `loadsuite` (will be prefixed with your cPanel username, e.g., `username_loadsuite`)
@@ -32,8 +32,8 @@ This guide walks you through deploying LoadSuite to a cPanel shared hosting envi
 
 6. **Note your connection details:**
    ```
-   Host: localhost (or the PostgreSQL server hostname shown in cPanel)
-   Port: 5432 (default PostgreSQL port)
+   Host: localhost
+   Port: 3306
    Database: username_loadsuite
    Username: username_loadsuite_user
    Password: (your generated password)
@@ -43,12 +43,12 @@ This guide walks you through deploying LoadSuite to a cPanel shared hosting envi
 
 ## Step 2: Run the Database Schema
 
-### Option A: Using phpPgAdmin (if available in cPanel)
+### Option A: Using phpMyAdmin (if available in cPanel)
 
-1. Open phpPgAdmin from cPanel
+1. Open phpMyAdmin from cPanel
 2. Select your database
 3. Click "SQL" tab
-4. Copy/paste contents of `scripts/schema.sql`
+4. Copy/paste contents of `scripts/schema_mysql.sql`
 5. Click "Execute"
 
 ### Option B: Using SSH/Terminal
@@ -57,9 +57,9 @@ This guide walks you through deploying LoadSuite to a cPanel shared hosting envi
 # Connect to your server via SSH or cPanel Terminal
 cd ~/LoadSuite
 
-# Connect to PostgreSQL and run schema
-psql -h localhost -U username_loadsuite_user -d username_loadsuite -f scripts/schema.sql
-# Enter your password when prompted
+# Initialize schema via Python helper (applies scripts/schema_mysql.sql)
+DATABASE_URL=mysql://username_loadsuite_user:YOUR_PASSWORD@localhost:3306/username_loadsuite \
+   python -m poetry run python scripts/init_db.py
 ```
 
 ### Option C: Using Python (after setup)
@@ -68,8 +68,9 @@ psql -h localhost -U username_loadsuite_user -d username_loadsuite -f scripts/sc
 cd ~/LoadSuite
 source venv/bin/activate
 
-# Use psql through the connection URL
-psql "$DATABASE_URL" -f scripts/schema.sql
+# Use the Python initializer through the connection URL
+DATABASE_URL=mysql://username_loadsuite_user:YOUR_PASSWORD@localhost:3306/username_loadsuite \
+   python -m poetry run python scripts/init_db.py
 ```
 
 ---
@@ -148,8 +149,8 @@ nano .env  # or use vim/cPanel File Manager
 **Update these values in `.env`:**
 
 ```bash
-# Database - use your actual cPanel PostgreSQL credentials
-DATABASE_URL=postgresql://username_loadsuite_user:YOUR_PASSWORD@localhost:5432/username_loadsuite
+# Database - use your actual cPanel MySQL credentials
+DATABASE_URL=mysql://username_loadsuite_user:YOUR_PASSWORD@localhost:3306/username_loadsuite?charset=utf8mb4
 
 # Production settings
 ENVIRONMENT=production

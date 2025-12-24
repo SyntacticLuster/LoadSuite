@@ -262,19 +262,41 @@ def _get_or_create_broker_profile(name: str, rng: random.Random, seed_key: int |
     return profile
 
 
-def generate_synthetic_loads(count: int, rng: random.Random | None = None, seed: int | None = None) -> Dataset:
+def generate_synthetic_loads(
+    count: int,
+    rng: random.Random | None = None,
+    seed: int | None = None,
+    now_override: datetime | None = None,
+) -> Dataset:
     """Generate `count` synthetic loads using the provided RNG.
 
     If `rng` is None, uses the module-level `random` for compatibility.
     If `seed` is provided, broker profiles and any seeded behavior will be stored
     under that seed key so cached datasets with the same seed are consistent.
+    The `now_override` parameter allows callers (scripts/tests) to supply a fixed
+    anchor time so generated timestamps are deterministic across runs.
     """
     rng = rng or random
-    now = _now_utc()
+    now = now_override or _now_utc()
     loads: list[Load] = []
+
+    # Round-robin coverage pass to ensure every city appears as origin and
+    # destination at least once when possible. This helps give good lane coverage
+    # when the number of loads is larger than the number of cities.
+    cities = list(_CITIES)
+    cities_len = len(cities)
+
+    i = 0
     for _ in range(count):
-        origin_city = _rand_city()
-        dest_city = _rand_city(excluding=(origin_city[0], origin_city[1]))
+        # For the first 2 * cities_len loads, cycle deterministically through
+        # origins and destinations to ensure coverage. After that, sample with RNG.
+        if i < 2 * cities_len:
+            origin_city = cities[i % cities_len]
+            dest_city = cities[(i + 1) % cities_len]
+        else:
+            origin_city = _rand_city()
+            dest_city = _rand_city(excluding=(origin_city[0], origin_city[1]))
+        i += 1
 
         pickup_start = now + timedelta(hours=rng.randint(1, 72))
         pickup_end = pickup_start + timedelta(hours=rng.randint(2, 10))
@@ -342,6 +364,21 @@ def generate_synthetic_loads(count: int, rng: random.Random | None = None, seed:
             )
         )
     return Dataset(loads=loads, source="synthetic")
+
+
+def load_dataset_from_file(path: str | Path) -> Dataset:
+    """Load a dataset JSON file (array of loads) and return a Dataset.
+
+    Uses existing validation to ensure the JSON matches the Load model. The
+    returned Dataset.source will be set to 'file:<name>' to indicate provenance.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Dataset file not found: {p}")
+    raw = p.read_bytes()
+    loads = loads_from_json_bytes(raw)
+    ds = Dataset(loads=loads, source=f"file:{p.name}")
+    return ds
 
 
 # In-process process-local cache for synthetic datasets keyed by (count, seed).
