@@ -49,6 +49,11 @@ const LAYOUT_BREAKPOINTS = {
   wide: 1400,
 };
 
+const DETAIL_LAYOUT_BREAKPOINTS = {
+  single: 1100,
+  three: 1400,
+};
+
 const DEFAULT_UI_PREFS = {
   show_greenlight_ticker: true,
   show_news_ticker: true,
@@ -84,6 +89,13 @@ const getTerminalLayoutMode = () => {
   if (width && width < LAYOUT_BREAKPOINTS.collapseBoth) return "narrow";
   if (width && width < LAYOUT_BREAKPOINTS.collapseRight) return "mid";
   return "wide";
+};
+
+const getDetailLayoutMode = () => {
+  const width = getViewportWidth();
+  if (width && width >= DETAIL_LAYOUT_BREAKPOINTS.three) return "three";
+  if (width && width >= DETAIL_LAYOUT_BREAKPOINTS.single) return "two";
+  return "single";
 };
 
 const getRailBounds = (side) => {
@@ -407,6 +419,7 @@ const state = {
     collapseRouteCast: false,
     panelsOpen: false,
     settingsOpen: false,
+    detailTab: "facts",
   },
   layout: {
     mode: "wide",
@@ -991,6 +1004,43 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
 
   wrap.appendChild(bodyWrap);
   return wrap;
+};
+
+const renderMapPanel = ({ origin, destination, polyline } = {}) => {
+  const originLabel = origin ? `${origin.city}, ${origin.state}` : "Origin";
+  const destinationLabel = destination ? `${destination.city}, ${destination.state}` : "Destination";
+  const body = el("div", { class: "pt-3 space-y-3" }, [
+    el("div", { class: "text-xs text-slate-600 dark:text-slate-400" }, [
+      "Map placeholder",
+    ]),
+    el("div", { class: "grid gap-2 text-xs text-slate-700 dark:text-slate-300" }, [
+      el("div", {}, [el("span", { class: "font-semibold" }, ["Origin"]), ` ${originLabel}`]),
+      el("div", {}, [el("span", { class: "font-semibold" }, ["Destination"]), ` ${destinationLabel}`]),
+    ]),
+    el(
+      "div",
+      {
+        class:
+          "flex min-h-[320px] items-center justify-center rounded-lg border border-dashed border-slate-300/70 bg-slate-50/60 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-400",
+      },
+      ["Map will render here"]
+    ),
+  ]);
+
+  return el(
+    "div",
+    {
+      class:
+        "rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900",
+    },
+    [
+      el("div", { class: "flex items-center justify-between" }, [
+        el("div", { class: "text-sm font-semibold text-slate-900 dark:text-slate-100" }, ["Map"]),
+        polyline ? el("div", { class: "text-xs text-slate-500 dark:text-slate-400" }, ["Route preview"]) : null,
+      ].filter(Boolean)),
+      body,
+    ]
+  );
 };
 
 const NEWS_TICKER_REFRESH_MS = 5 * 60 * 1000;
@@ -3266,7 +3316,7 @@ const renderDetail = async (root, id) => {
     [isWatched ? "★ Watching" : "☆ Add to Watchlist"]
   );
 
-  const leftCol = el("div", { class: "min-w-0 w-full lg:flex-none lg:w-[360px]" }, [
+  const leftCol = el("div", { class: "min-w-0" }, [
     el("div", { class: "flex items-center justify-between gap-2" }, [
       el("div", { class: "text-base font-semibold" }, [
         `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`,
@@ -3310,16 +3360,86 @@ const renderDetail = async (root, id) => {
     el("div", { class: "pt-3" }, [watchlistBtn]),
   ]);
 
-  const rightCol = el("div", { class: "pt-3 lg:pt-0 lg:w-[28rem] lg:flex-shrink-0" }, [
-    renderRouteCastWidget(id, { compact: false, load }),
-  ]);
+  const factsPanel = el(
+    "div",
+    {
+      class:
+        "rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900",
+    },
+    [leftCol]
+  );
+  const routecastPanel = renderRouteCastWidget(id, { compact: false, load });
+  const mapPanel = renderMapPanel({ origin: load.origin, destination: load.destination, polyline: null });
+  const layoutMode = getDetailLayoutMode();
 
-  const card = el("div", { class: "mt-3 w-full lg:w-fit rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" }, [
-    el("div", { class: "lg:flex lg:items-start lg:gap-2" }, [leftCol, rightCol]),
-  ]);
+  if (layoutMode === "single" && !state.ui.detailTab) {
+    state.ui.detailTab = "facts";
+  }
+
+  const tabButton = (id, label) => {
+    const isActive = state.ui.detailTab === id;
+    return el(
+      "button",
+      {
+        type: "button",
+        class:
+          "rounded-md px-3 py-1.5 text-xs font-semibold transition " +
+          (isActive
+            ? "bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100"
+            : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"),
+        onclick: () => {
+          state.ui.detailTab = id;
+          render();
+        },
+      },
+      [label]
+    );
+  };
+
+  const layout = (() => {
+    if (layoutMode === "three") {
+      return el(
+        "div",
+        {
+          class: "mt-3 grid gap-3",
+          style: "grid-template-columns: 360px minmax(0, 1fr) 28rem;",
+        },
+        [factsPanel, mapPanel, routecastPanel]
+      );
+    }
+    if (layoutMode === "two") {
+      return el(
+        "div",
+        {
+          class: "mt-3 grid gap-3",
+          style: "grid-template-columns: minmax(0, 1fr) 28rem;",
+        },
+        [
+          el("div", { class: "space-y-3" }, [factsPanel, mapPanel]),
+          routecastPanel,
+        ]
+      );
+    }
+
+    const panel = state.ui.detailTab === "routecast"
+      ? routecastPanel
+      : state.ui.detailTab === "map"
+        ? mapPanel
+        : factsPanel;
+
+    return el("div", { class: "mt-3" }, [panel]);
+  })();
 
   root.appendChild(back);
-  root.appendChild(card);
+  if (layoutMode === "single") {
+    const tabs = el("div", { class: "mt-3 inline-flex gap-1 rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900" }, [
+      tabButton("facts", "Facts"),
+      tabButton("map", "Map"),
+      tabButton("routecast", "RouteCast"),
+    ]);
+    root.appendChild(tabs);
+  }
+  root.appendChild(layout);
 };
 
 const renderSettings = async (root) => {
