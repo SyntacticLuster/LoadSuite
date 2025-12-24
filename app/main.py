@@ -54,7 +54,7 @@ from .api_models import (
 from .routecast_cache import RouteCastCache
 from .stores import AlertRulesStore, FilterPresetsStore, PersistentWatchlistStore, PreferencesStore, WatchlistStore
 from .scoring import ScoringEngine
-from .scoring.models import UserPreferences
+from .scoring.models import CompositeScore, UserPreferences
 from .weather import (
     alerts_for_zip,
     forecast_for_zip,
@@ -789,6 +789,7 @@ def list_scored_loads(
     lane_history: Optional[bool] = None,
     sort: str = "composite",
     limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     include_routecast: bool = Query(default=False, description="Include RouteCast scores for up to 25 loads"),
     routecast_client: RouteCastClient | None = Depends(get_routecast_client),
 ) -> ScoredLoadsResponse:
@@ -814,18 +815,29 @@ def list_scored_loads(
     now = datetime.now(timezone.utc)
     filtered = apply_filters(_active_loads(ctx), query)
     total_filtered = len(filtered)
-    loads_for_scoring = filtered if sort == "score_desc" else apply_sort(filtered, query, now)[:limit]
-    
+
     # Get user preferences for scoring
     prefs_model, _ = ctx.preferences_store.get(user_id)
     user_prefs = _convert_prefs_to_user_prefs(prefs_model)
-    scored_loads: List[ScoredLoadModel] = []
     allow_routecast = include_routecast and settings.routecast_enabled and routecast_client is not None
     max_routecast = 25
 
-    for idx, load in enumerate(loads_for_scoring):
-        composite = scoring.score(load, preferences=user_prefs, now=now)
+    page_entries: list[tuple[Load, CompositeScore]] = []
+    if sort == "score_desc":
+        scored_candidates: list[tuple[Load, CompositeScore]] = []
+        for load in filtered:
+            composite = scoring.score(load, preferences=user_prefs, now=now)
+            scored_candidates.append((load, composite))
+        scored_candidates.sort(key=lambda entry: entry[1].score, reverse=True)
+        page_entries = scored_candidates[offset: offset + limit]
+    else:
+        sorted_loads = apply_sort(filtered, query, now)
+        for load in sorted_loads[offset: offset + limit]:
+            composite = scoring.score(load, preferences=user_prefs, now=now)
+            page_entries.append((load, composite))
 
+    scored_loads: List[ScoredLoadModel] = []
+    for idx, (load, composite) in enumerate(page_entries):
         routecast: RouteCastScoreResponse | None = None
         if allow_routecast and idx < max_routecast:
             try:
@@ -855,10 +867,6 @@ def list_scored_loads(
             greenlight=_meets_greenlight_criteria(load, prefs_model, ctx, user_id),
             routecast=routecast,
         ))
-    
-    if sort == "score_desc":
-        scored_loads.sort(key=lambda s: s.score, reverse=True)
-        scored_loads = scored_loads[:limit]
 
     return ScoredLoadsResponse(total=total_filtered, loads=scored_loads)
 

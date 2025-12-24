@@ -326,9 +326,12 @@ const DEFAULT_QUERY = {
   broker_rating_min: "",
   detention: "",
   multi_stop: "",
+  watchlisted: "",
   lane_history: "",
   sort: "composite",
 };
+
+const LIST_PAGE_SIZE = 200;
 
 const SORT_OPTIONS = [
   { value: "composite", label: "Composite" },
@@ -377,6 +380,8 @@ const state = {
   },
 
   lastSelectedLoadId: "",
+  listPage: 0,
+  listTotal: 0,
 
   routecast: {
     loadId: "",
@@ -630,6 +635,7 @@ const renderWeatherSidebar = () => {
   let alertsLocationLabel = "";
   let alertsTitle = "Severe Weather Alerts";
   let alertsTitleClass = "text-red-600 dark:text-red-400";
+  const alertsAlways = [];
   if (zipOk && state.weather.fetchingAlerts) {
     alertsBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading alerts…"]));
   } else if (zipOk && state.weather.alertsError) {
@@ -649,6 +655,9 @@ const renderWeatherSidebar = () => {
     }
     if (!items.length) {
       alertsBody.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["No active alerts."]));
+      if (state.ui.collapseAlerts) {
+        alertsAlways.push(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["No active alerts."]));
+      }
     } else {
       for (const a of items.slice(0, 3)) {
         alertsBody.push(
@@ -673,13 +682,13 @@ const renderWeatherSidebar = () => {
     alertsBody,
     alertsTitleClass,
     "collapseAlerts",
-    { showZipChange: true, locationLabel: alertsLocationLabel }
+    { showZipChange: true, locationLabel: alertsLocationLabel, alwaysChildren: alertsAlways }
   );
 
   // RouteCast (last selected load) lives under the weather widgets.
   const routecastWidget = renderRouteCastWidget(state.lastSelectedLoadId, { compact: true });
 
-  return el("div", { class: "space-y-3 lg:w-80 lg:flex-shrink-0 lg:sticky lg:top-16 lg:self-start" }, [
+  return el("div", { class: "order-first lg:order-none space-y-3 lg:w-80 lg:flex-shrink-0 lg:sticky lg:top-16 lg:self-start" }, [
     routecastWidget,
     alertsWidget,
     forecastWidget,
@@ -1181,6 +1190,7 @@ const saveFilterPreset = async (name) => {
 
 const loadFilterPreset = (preset) => {
   state.query = { ...state.query, ...preset.filters };
+  state.listPage = 0;
   render();
 };
 
@@ -1451,10 +1461,67 @@ const render = async () => {
   }
 };
 
+const setListPage = (pageIndex) => {
+  const totalPages = Math.max(1, Math.ceil((state.listTotal || 0) / LIST_PAGE_SIZE));
+  const clamped = Math.max(0, Math.min(totalPages - 1, pageIndex));
+  if (clamped === state.listPage) return;
+  state.listPage = clamped;
+  render();
+};
+
+const renderPaginationRow = (total) => {
+  const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
+  const currentPage = Math.min(state.listPage, totalPages - 1);
+  const disabledPrev = currentPage === 0;
+  const disabledNext = currentPage >= totalPages - 1;
+  const buttonClass =
+    "inline-flex h-8 items-center justify-center rounded-md border border-slate-700 bg-slate-900/60 px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-200 transition hover:border-sky-400 disabled:border-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed";
+  const createButton = (label, target, title, disabled) =>
+    el(
+      "button",
+      {
+        type: "button",
+        class: buttonClass,
+        title,
+        disabled,
+        onclick: () => setListPage(target),
+      },
+      [label]
+    );
+  const controls = el(
+    "div",
+    { class: "flex items-center gap-1" },
+    [
+      createButton("<<", 0, "Jump to first page", disabledPrev),
+      createButton("-5", currentPage - 5, "Back five pages", disabledPrev),
+      createButton("<", currentPage - 1, "Previous page", disabledPrev),
+      el("span", { class: "px-2 text-[0.65rem] font-semibold tracking-wide text-slate-400 dark:text-slate-500" }, [
+        `${currentPage + 1}/${totalPages}`,
+      ]),
+      createButton(">", currentPage + 1, "Next page", disabledNext),
+      createButton("+5", currentPage + 5, "Forward five pages", disabledNext),
+      createButton(">>", totalPages - 1, "Jump to last page", disabledNext),
+    ]
+  );
+  const pagesLabel = el(
+    "span",
+    { class: "text-[0.65rem] font-semibold tracking-wide text-slate-400 dark:text-slate-500" },
+    [`${totalPages} pages`]
+  );
+  return el(
+    "div",
+    { class: "flex items-center justify-between gap-4 pt-2 text-xs text-slate-600 dark:text-slate-400" },
+    [
+      el("div", { class: "font-semibold text-slate-700 dark:text-slate-300" }, [`${total} loads`]),
+      el("div", { class: "flex items-center gap-3" }, [pagesLabel, controls]),
+    ]
+  );
+};
+
 const renderList = async (root) => {
-  const layout = el("div", { class: "lg:flex lg:gap-4" });
+  const layout = el("div", { class: "flex flex-col gap-4 lg:flex-row" });
   const sidebar = state.uiPrefs.show_sidebar ? renderWeatherSidebar() : null;
-  const main = el("div", { class: "min-w-0 flex-1" });
+  const main = el("div", { class: "min-w-0 flex-1 order-last lg:order-none" });
 
   const top = el("div", { class: "space-y-3" });
 
@@ -1473,7 +1540,10 @@ const renderList = async (root) => {
       {
         class:
           "shrink-0 rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
-        onclick: () => render(),
+        onclick: () => {
+          state.listPage = 0;
+          render();
+        },
       },
       ["Search"]
     ),
@@ -1537,6 +1607,7 @@ const renderList = async (root) => {
           "rounded-md border border-sky-500 bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
         onchange: async (e) => {
           state.query.sort = e.target.value;
+          state.listPage = 0;
           await render();
         },
       },
@@ -1580,9 +1651,19 @@ const renderList = async (root) => {
   await fetchFilterPresets();
 
   const qs = buildQueryString();
-  const limitParam = qs ? `${qs}&limit=200` : "?limit=200";
-  const data = await apiGet(`/api/loads/scored${limitParam}`);
-  listWrap.appendChild(el("div", { class: "text-xs text-slate-600 dark:text-slate-400 pt-2" }, [`${data.total} loads`]))
+  const offset = Math.max(0, state.listPage) * LIST_PAGE_SIZE;
+  const querySuffix = qs
+    ? `${qs}&limit=${LIST_PAGE_SIZE}&offset=${offset}`
+    : `?limit=${LIST_PAGE_SIZE}&offset=${offset}`;
+  const data = await apiGet(`/api/loads/scored${querySuffix}`);
+  const totalPages = Math.max(1, Math.ceil(data.total / LIST_PAGE_SIZE));
+  if (state.listPage >= totalPages) {
+    state.listPage = Math.max(0, totalPages - 1);
+    state.listTotal = data.total;
+    return render();
+  }
+  state.listTotal = data.total;
+  listWrap.appendChild(renderPaginationRow(data.total));
 
   const ul = el("div", { class: "grid grid-cols-1 gap-2 pt-2 lg:grid-cols-2" });
   const scoredItems = Array.isArray(data.loads) ? data.loads : [];
@@ -1841,22 +1922,14 @@ const renderPrefsPanel = () => {
     return s;
   };
 
-  wrap.appendChild(
+    wrap.appendChild(
     el("div", { class: "text-sm font-semibold" }, [
       el("span", { class: "inline-flex items-center align-middle" }, [
         el("img", {
-          src: toAppUrl("/static/images/gl_glyph.png"),
+          src: toAppUrl("/static/images/gl_logo.png"),
           alt: "GreenLight",
-          class: "inline-block align-middle h-4 w-4 transform scale-150",
+          class: "h-11 w-auto object-contain",
         }),
-        el(
-          "span",
-          {
-            class:
-              "ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900 dark:text-green-200",
-          },
-          ["GreenLight"]
-        ),
       ]),
     ])
   );
@@ -2324,6 +2397,10 @@ const renderFiltersPanel = () => {
         { value: "true", label: "Yes" },
         { value: "false", label: "No" },
       ])),
+      row("Watchlisted", sel("watchlisted", [
+        { value: "true", label: "Yes" },
+        { value: "false", label: "No" },
+      ])),
       row("Lane history", sel("lane_history", [
         { value: "true", label: "Yes" },
         { value: "false", label: "No" },
@@ -2338,7 +2415,10 @@ const renderFiltersPanel = () => {
       {
         class:
           "w-full rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
-        onclick: () => render(),
+        onclick: () => {
+          state.listPage = 0;
+          render();
+        },
       },
       ["Apply"]
       ),
@@ -2364,15 +2444,16 @@ const renderFiltersPanel = () => {
 
   wrap.appendChild(
     el(
-      "button",
-      {
-        class:
-          "mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
-        title: "Clear saved filter defaults and reset filters",
-        onclick: () => {
-          clearFilterDefaults();
-          state.query = { ...DEFAULT_QUERY };
-          render();
+        "button",
+        {
+          class:
+            "mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+          title: "Clear saved filter defaults and reset filters",
+          onclick: () => {
+            clearFilterDefaults();
+            state.query = { ...DEFAULT_QUERY };
+            state.listPage = 0;
+            render();
         },
       },
       ["Reset Defaults"]
@@ -2851,7 +2932,10 @@ state.lastSelectedLoadId = getLastSelectedLoadId();
 syncPreferences(state.prefs);
 {
   const defaults = getFilterDefaults();
-  if (defaults) state.query = { ...DEFAULT_QUERY, ...defaults, q: "" };
+  if (defaults) {
+    state.query = { ...DEFAULT_QUERY, ...defaults, q: "" };
+    state.listPage = 0;
+  }
 }
 {
   const defaults = getUiPrefs();
