@@ -84,6 +84,44 @@ class TestScoredLoadsEndpoint:
         assert data["loads"]
         assert all(not item["greenlight"] for item in data["loads"])
 
+    def test_scored_loads_greenlight_requires_watchlisted(self):
+        """GreenLight respects watchlisted preference."""
+        user_id = "test-greenlight-watchlisted"
+        loads_response = client.get("/api/loads")
+        assert loads_response.status_code == 200
+        loads = loads_response.json()["loads"]
+        assert len(loads) >= 1
+
+        watched_load_id = loads[0]["id"]
+
+        response = client.post(
+            "/api/watchlist",
+            params={"user_id": user_id},
+            json={"item_type": "load", "load_id": watched_load_id},
+        )
+        assert response.status_code == 200
+
+        response = client.put(
+            "/api/preferences",
+            params={"user_id": user_id},
+            json={"watchlisted": True},
+        )
+        assert response.status_code == 200
+
+        response = client.get(f"/api/loads/{watched_load_id}/score", params={"user_id": user_id})
+        assert response.status_code == 200
+        assert response.json()["greenlight"] is True
+
+        watchlist = client.get("/api/watchlist", params={"user_id": user_id}).json()["items"]
+        assert len(watchlist) == 1
+        item_id = watchlist[0]["id"]
+        delete_res = client.delete(f"/api/watchlist/{item_id}", params={"user_id": user_id})
+        assert delete_res.status_code == 200
+
+        response = client.get(f"/api/loads/{watched_load_id}/score", params={"user_id": user_id})
+        assert response.status_code == 200
+        assert response.json()["greenlight"] is False
+
     def test_individual_load_score(self):
         """Verify individual load score endpoint."""
         # First get a load ID
@@ -129,6 +167,7 @@ class TestPreferencesEndpoint:
             "max_deadhead_miles": 150,
             "equipment_types": ["Dry Van", "Reefer"],
             "detention": True,
+            "watchlisted": True,
             "hazmat": False,
             "multi_stop": True,
         }
@@ -144,6 +183,7 @@ class TestPreferencesEndpoint:
         assert data["preferences"]["min_rpm"] == 2.50
         assert data["preferences"]["max_deadhead_miles"] == 150
         assert data["preferences"]["detention"] is True
+        assert data["preferences"]["watchlisted"] is True
         assert data["preferences"]["hazmat"] is False
         assert data["preferences"]["multi_stop"] is True
 

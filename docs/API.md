@@ -361,6 +361,7 @@ Get current user scoring preferences.
     "home_base": "ATL_GA",
     "hazmat_endorsed": false,
     "detention": null,
+    "watchlisted": null,
     "hazmat": null,
     "multi_stop": null,
     "min_broker_rating": 3.5,
@@ -384,6 +385,7 @@ Update user scoring preferences.
   "min_rpm": 2.75,
   "max_deadhead_miles": 150,
   "equipment_types": ["Dry Van"],
+  "watchlisted": true,
   "detention": false,
   "hazmat": false,
   "multi_stop": null

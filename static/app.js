@@ -345,6 +345,7 @@ const DEFAULT_PREFS = {
   weight_max: "",
   weight_min: "",
   detention: "",
+  watchlisted: "",
   broker_rating_min: "",
   deadhead_max: "",
   hazmat: "",
@@ -1032,17 +1033,23 @@ const runWatchlistSweep = async () => {
     for (const t of top) {
       const existing = (state.latestLoads || []).find((l) => l.id === t.load_id) || null;
       let route = t.load_id;
+      let price = null;
+      let rpm = null;
       if (existing) {
         route = `${existing.origin.city}, ${existing.origin.state} → ${existing.destination.city}, ${existing.destination.state}`;
+        price = existing.rate_total_usd ?? null;
+        rpm = existing.rpm ?? null;
       } else {
         try {
           const load = await apiGet(`/api/loads/${t.load_id}`);
           route = `${load.origin.city}, ${load.origin.state} → ${load.destination.city}, ${load.destination.state}`;
+          price = load.rate_total_usd ?? null;
+          rpm = load.rpm ?? null;
         } catch {
           // Keep fallback route as the load ID.
         }
       }
-      items.push({ load_id: t.load_id, score: t.score, route });
+      items.push({ load_id: t.load_id, score: t.score, route, price, rpm });
     }
 
     state.watchlistSweep.items = items;
@@ -1208,6 +1215,7 @@ const buildPreferencesPayload = (prefs) => ({
   min_broker_rating: parseOptionalNumber(prefs.broker_rating_min),
   equipment_types: prefs.equipment ? [prefs.equipment] : null,
   detention: _parseOptionalBool(prefs.detention),
+  watchlisted: _parseOptionalBool(prefs.watchlisted),
   hazmat: _parseOptionalBool(prefs.hazmat),
   multi_stop: _parseOptionalBool(prefs.multi_stop),
 });
@@ -1228,6 +1236,7 @@ const prefStatus = (load) => {
   const deadheadMax = parseOptionalNumber(state.prefs.deadhead_max);
   const hazmatPref = state.prefs.hazmat;
   const multiStopPref = state.prefs.multi_stop;
+  const watchlistedPref = state.prefs.watchlisted;
 
   const rpmOk = rpmMin === null ? null : load.rpm >= rpmMin;
   const equipmentOk = !state.prefs.equipment ? null : load.equipment === state.prefs.equipment;
@@ -1239,6 +1248,10 @@ const prefStatus = (load) => {
   let detentionOk = null;
   if (state.prefs.detention === "true") detentionOk = !!load.detention;
   else if (state.prefs.detention === "false") detentionOk = !load.detention;
+
+  let watchlistedOk = null;
+  if (watchlistedPref === "true") watchlistedOk = state.watchlist.has(load.id);
+  else if (watchlistedPref === "false") watchlistedOk = !state.watchlist.has(load.id);
 
   let hazmatOk = null;
   if (hazmatPref === "true") hazmatOk = !!load.hazmat;
@@ -1254,6 +1267,7 @@ const prefStatus = (load) => {
     weightOk,
     weightMinOk,
     detentionOk,
+    watchlistedOk,
     brokerOk,
     deadheadOk,
     hazmatOk,
@@ -1271,6 +1285,7 @@ const greenlightGaps = (load) => {
   if (parseOptionalNumber(prefs.weight_min) !== null && status.weightMinOk === false) gaps.push("Weight min");
   if (prefs.equipment && status.equipmentOk === false) gaps.push("Equipment");
   if (prefs.detention && status.detentionOk === false) gaps.push("Detention");
+  if (prefs.watchlisted && status.watchlistedOk === false) gaps.push("Watchlisted");
   if (parseOptionalNumber(prefs.broker_rating_min) !== null && status.brokerOk === false) gaps.push("Broker rating");
   if (parseOptionalNumber(prefs.deadhead_max) !== null && status.deadheadOk === false) gaps.push("Deadhead");
   if ((prefs.hazmat === "true" || prefs.hazmat === "false") && status.hazmatOk === false) gaps.push("Hazmat pref");
@@ -1304,6 +1319,7 @@ const isGreenLight = (load) => {
   const deadheadActive = deadheadMax !== null;
   const weightMinActive = weightMin !== null;
   const multiStopActive = prefs.multi_stop === "true" || prefs.multi_stop === "false";
+  const watchlistedActive = prefs.watchlisted === "true" || prefs.watchlisted === "false";
 
   // When no preference is set we should not auto-signal a perfect green light.
   // Returning true here causes every load to appear greenlit even with an empty preference set.
@@ -1312,6 +1328,7 @@ const isGreenLight = (load) => {
     weightMax === null &&
     !equipmentActive &&
     !detentionActive &&
+    !watchlistedActive &&
     !brokerActive &&
     !deadheadActive &&
     !weightMinActive &&
@@ -1326,6 +1343,7 @@ const isGreenLight = (load) => {
     weightOk,
     weightMinOk,
     detentionOk,
+    watchlistedOk,
     brokerOk,
     deadheadOk,
     hazmatOk,
@@ -1337,6 +1355,7 @@ const isGreenLight = (load) => {
     weightMax === null ? null : weightOk,
     weightMinActive ? weightMinOk : null,
     detentionActive ? detentionOk : null,
+    watchlistedActive ? watchlistedOk : null,
     brokerActive ? brokerOk : null,
     deadheadActive ? deadheadOk : null,
     hazmatActive ? hazmatOk : null,
@@ -1354,6 +1373,8 @@ const hasActivePrefs = () => {
     String(prefs.equipment ?? "").trim() !== "" ||
     prefs.detention === "true" ||
     prefs.detention === "false" ||
+    prefs.watchlisted === "true" ||
+    prefs.watchlisted === "false" ||
     String(prefs.broker_rating_min ?? "").trim() !== "" ||
     String(prefs.deadhead_max ?? "").trim() !== "" ||
     prefs.hazmat === "true" ||
@@ -1864,6 +1885,13 @@ const renderPrefsPanel = () => {
         ])
       ),
       row(
+        "Watchlisted",
+        sel("watchlisted", [
+          { value: "true", label: "Required" },
+          { value: "false", label: "No" },
+        ])
+      ),
+      row(
         "Hazmat",
         sel("hazmat", [
           { value: "true", label: "Required" },
@@ -2085,7 +2113,31 @@ const renderTerminalPanel = () => {
             class:
               "block rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
           },
-          [`${item.score.toFixed(0)} • ${item.route}`]
+          [
+            el(
+              "div",
+              { class: "flex items-start justify-between gap-3" },
+              [
+                el(
+                  "div",
+                  { class: "text-[0.75rem] font-semibold text-slate-900 dark:text-slate-100" },
+                  [`${item.score.toFixed(0)} • ${item.route}`]
+                ),
+                el(
+                  "div",
+                  { class: "flex flex-col items-end text-[0.65rem] text-slate-500 dark:text-slate-400 space-y-0.5" },
+                  [
+                    item.price != null
+                      ? el("div", { class: "font-semibold text-slate-800 dark:text-slate-200" }, [fmtMoney(item.price)])
+                      : null,
+                    item.rpm != null
+                      ? el("div", {}, [`$${fmtNum(item.rpm, 2)}/mi`])
+                      : null,
+                  ].filter(Boolean)
+                ),
+              ]
+            ),
+          ]
         )
       );
     }

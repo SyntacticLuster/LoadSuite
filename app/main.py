@@ -702,12 +702,13 @@ def _greenlight_criteria_active(prefs: PreferencesModel) -> bool:
         prefs.min_broker_rating is not None,
         bool(prefs.equipment_types),
         prefs.detention is not None,
+        prefs.watchlisted is not None,
         prefs.hazmat is not None,
         prefs.multi_stop is not None,
     ])
 
 
-def _meets_greenlight_criteria(load: Load, prefs: PreferencesModel) -> bool:
+def _meets_greenlight_criteria(load: Load, prefs: PreferencesModel, ctx: AppContext, user_id: str) -> bool:
     if not _greenlight_criteria_active(prefs):
         return False
 
@@ -726,6 +727,12 @@ def _meets_greenlight_criteria(load: Load, prefs: PreferencesModel) -> bool:
             return False
     if prefs.detention is not None and load.detention is not prefs.detention:
         return False
+    if prefs.watchlisted is not None:
+        is_watched = ctx.watchlist_store.has_load(user_id, load.id)
+        if prefs.watchlisted and not is_watched:
+            return False
+        if not prefs.watchlisted and is_watched:
+            return False
     if prefs.hazmat is not None and load.hazmat is not prefs.hazmat:
         return False
     if prefs.multi_stop is not None and load.multi_stop is not prefs.multi_stop:
@@ -845,7 +852,7 @@ def list_scored_loads(
             top_reasons=[_factor_to_model(f) for f in composite.top_reasons[:3]],
             factors=[_factor_to_model(f) for f in composite.factors],
             confidence=composite.confidence,
-            greenlight=_meets_greenlight_criteria(load, prefs_model),
+            greenlight=_meets_greenlight_criteria(load, prefs_model, ctx, user_id),
             routecast=routecast,
         ))
     
@@ -883,7 +890,7 @@ def get_load_score(
         top_reasons=[_factor_to_model(f) for f in composite.top_reasons[:3]],
         factors=[_factor_to_model(f) for f in composite.factors],
         confidence=composite.confidence,
-        greenlight=_meets_greenlight_criteria(load, prefs_model),
+        greenlight=_meets_greenlight_criteria(load, prefs_model, ctx, user_id),
     )
 
 

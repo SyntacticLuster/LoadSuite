@@ -144,6 +144,10 @@ class PreferencesModel(BaseModel):
         default=None,
         description="Require detention flag (true/false) for GreenLight"
     )
+    watchlisted: Optional[bool] = Field(
+        default=None,
+        description="Require watchlisted flag (true/false) for GreenLight"
+    )
     hazmat: Optional[bool] = Field(
         default=None,
         description="Require hazmat flag (true/false) for GreenLight"
