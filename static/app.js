@@ -403,6 +403,7 @@ const state = {
     collapseAlerts: true,
     collapseRouteCast: false,
     panelsOpen: false,
+    settingsOpen: false,
   },
   layout: {
     mode: "wide",
@@ -559,6 +560,7 @@ const renderWeatherSidebar = () => {
     { showZipChange, locationLabel, alwaysChildren } = {}
   ) => {
     const isCollapsed = collapseKey ? !!state.ui[collapseKey] : false;
+    const bodyId = collapseKey ? `weather-${collapseKey}-body` : null;
     const toggleBtn = collapseKey
       ? el(
           "button",
@@ -569,7 +571,11 @@ const renderWeatherSidebar = () => {
             "aria-label": isCollapsed ? "Show" : "Hide",
             onclick: () => {
               state.ui[collapseKey] = !state.ui[collapseKey];
-              render();
+              const next = !!state.ui[collapseKey];
+              if (bodyId) setNodeVisible(bodyId, !next);
+              toggleBtn.textContent = next ? "Show" : "Hide";
+              toggleBtn.setAttribute("aria-label", next ? "Show" : "Hide");
+              toggleBtn.setAttribute("title", next ? "Show" : "Hide");
             },
           },
           [isCollapsed ? "Show" : "Hide"]
@@ -604,6 +610,15 @@ const renderWeatherSidebar = () => {
           )
         : null;
 
+    const bodyWrap = el(
+      "div",
+      { id: bodyId || undefined },
+      [...bodyChildren]
+    );
+    if (collapseKey) {
+      bodyWrap.style.display = isCollapsed ? "none" : "";
+      bodyWrap.setAttribute("aria-hidden", isCollapsed ? "true" : "false");
+    }
     return el(
       "div",
       { class: "rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" },
@@ -614,7 +629,7 @@ const renderWeatherSidebar = () => {
         ].filter(Boolean)),
         subRow,
         ...((alwaysChildren && Array.isArray(alwaysChildren)) ? alwaysChildren : []),
-        ...(!isCollapsed ? bodyChildren : []),
+        bodyWrap,
       ]
     );
   };
@@ -738,9 +753,12 @@ const renderWeatherSidebar = () => {
   const routecastWidget = state.uiPrefs.show_routecast
     ? renderRouteCastWidget(state.lastSelectedLoadId, { compact: true })
     : null;
+  const routecastWrap = routecastWidget
+    ? el("div", { style: "padding-bottom: 10px;" }, [routecastWidget])
+    : null;
 
   return el("div", { class: "space-y-3" }, [
-    routecastWidget,
+    routecastWrap,
     alertsWidget,
     forecastWidget,
   ].filter(Boolean));
@@ -809,9 +827,11 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
       : null,
   ];
 
+  const bodyId = `routecast-body-${compact ? "compact" : "full"}`;
+  let toggleBtn;
   const titleRow = el(
     "div",
-    { class: "flex items-center justify-between gap-2" },
+    { class: "flex items-center justify-between gap-2 pb-3" },
     [
       el(
         "div",
@@ -824,7 +844,7 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
         },
         logoBlockChildren
       ),
-      el(
+      (toggleBtn = el(
         "button",
         {
           class:
@@ -833,11 +853,15 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
           "aria-label": isCollapsed ? "Show" : "Hide",
           onclick: () => {
             state.ui.collapseRouteCast = !state.ui.collapseRouteCast;
-            render();
+            const next = !!state.ui.collapseRouteCast;
+            setNodeVisible(bodyId, !next);
+            toggleBtn.textContent = next ? "Show" : "Hide";
+            toggleBtn.setAttribute("aria-label", next ? "Show" : "Hide");
+            toggleBtn.setAttribute("title", next ? "Show" : "Hide");
           },
         },
         [isCollapsed ? "Show" : "Hide"]
-      ),
+      )),
     ]
   );
 
@@ -845,12 +869,14 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
     "div",
     {
       class:
-        "rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900",
+        "rounded-xl border border-slate-200 bg-white/90 p-4 shadow-[0_12px_40px_rgba(14,165,233,0.25)] dark:border-slate-700 dark:bg-slate-900/70",
     },
     [titleRow]
   );
 
-  if (isCollapsed) return wrap;
+  const bodyWrap = el("div", { id: bodyId }, []);
+  bodyWrap.style.display = isCollapsed ? "none" : "";
+  bodyWrap.setAttribute("aria-hidden", isCollapsed ? "true" : "false");
 
   const summaryLoad = load || state.latestLoads.find((l) => String(l?.id || "") === id) || null;
   if (id && summaryLoad) {
@@ -861,7 +887,7 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
     const equipment = summaryLoad.equipment ? String(summaryLoad.equipment) : "";
     const metrics = [rpm, distance, deadhead, equipment].filter(Boolean).join(" • ");
 
-    wrap.appendChild(
+    bodyWrap.appendChild(
       el("div", { class: "pt-2" }, [
         el("div", { class: "text-xs font-semibold text-slate-800 dark:text-slate-200" }, [lane]),
         metrics
@@ -872,9 +898,10 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
   }
 
   if (!id) {
-    wrap.appendChild(
+    bodyWrap.appendChild(
       el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Select a load to see RouteCast."])
     );
+    wrap.appendChild(bodyWrap);
     return wrap;
   }
 
@@ -883,19 +910,22 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
   }
 
   if (state.routecast.fetching && state.routecast.loadId === id) {
-    wrap.appendChild(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading RouteCast…"]));
+    bodyWrap.appendChild(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["Loading RouteCast…"]));
+    wrap.appendChild(bodyWrap);
     return wrap;
   }
 
   if (state.routecast.error && state.routecast.loadId === id) {
-    wrap.appendChild(
+    bodyWrap.appendChild(
       el("div", { class: "pt-2 text-xs text-red-600 dark:text-red-400" }, ["Select a route to view RouteCast"])
     );
+    wrap.appendChild(bodyWrap);
     return wrap;
   }
 
   if (!rc) {
-    wrap.appendChild(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["RouteCast not available."]));
+    bodyWrap.appendChild(el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, ["RouteCast not available."]));
+    wrap.appendChild(bodyWrap);
     return wrap;
   }
 
@@ -925,7 +955,7 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
     ]);
   };
 
-  wrap.appendChild(
+  bodyWrap.appendChild(
     el(compact ? "div" : "div", { class: compact ? "pt-2 grid gap-2" : "pt-2 grid gap-2" }, [
       endpointBlock("Origin", rc.origin),
       endpointBlock("Destination", rc.destination),
@@ -934,21 +964,22 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
 
   const alerts = rc.route_alerts?.alerts || [];
   const alertCount = rc.route_alerts?.count ?? alerts.length;
-  wrap.appendChild(el("div", { class: "pt-3 text-xs font-semibold text-slate-600 dark:text-slate-400" }, ["Route alerts"]));
+  bodyWrap.appendChild(el("div", { class: "pt-3 text-xs font-semibold text-slate-600 dark:text-slate-400" }, ["Route alerts"]));
   if (!alerts.length) {
-    wrap.appendChild(el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, ["No active alerts detected along the route."]));
+    bodyWrap.appendChild(el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, ["No active alerts detected along the route."]));
   } else {
-    wrap.appendChild(el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, [`${alertCount} active alert(s)`]));
+    bodyWrap.appendChild(el("div", { class: "pt-1 text-xs text-slate-600 dark:text-slate-400" }, [`${alertCount} active alert(s)`]));
     for (const a of alerts.slice(0, compact ? 2 : 3)) {
       const label = a.event || "Alert";
       const sev = a.severity ? ` • ${a.severity}` : "";
-      wrap.appendChild(el("div", { class: "pt-2 text-xs" }, [
+      bodyWrap.appendChild(el("div", { class: "pt-2 text-xs" }, [
         el("div", { class: "font-semibold text-slate-800 dark:text-slate-200" }, [`${label}${sev}`]),
         a.headline ? el("div", { class: "text-slate-600 dark:text-slate-400" }, [a.headline]) : null,
       ].filter(Boolean)));
     }
   }
 
+  wrap.appendChild(bodyWrap);
   return wrap;
 };
 
@@ -1724,6 +1755,48 @@ const applyTerminalLayout = () => {
   }
 };
 
+const setNodeVisible = (id, visible) => {
+  const node = document.getElementById(id);
+  if (!node) return;
+  node.style.display = visible ? "" : "none";
+  node.setAttribute("aria-hidden", visible ? "false" : "true");
+};
+
+const updatePanelsDropdown = (open) => {
+  const btn = document.getElementById("terminal-panels-btn");
+  const menu = document.getElementById("terminal-panels-menu");
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (menu) menu.style.display = open ? "" : "none";
+};
+
+const updateSettingsDropdown = (open) => {
+  const btn = document.getElementById("terminal-settings-btn");
+  const menu = document.getElementById("terminal-settings-menu");
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (menu) menu.style.display = open ? "" : "none";
+};
+
+const setWorkflowsOpen = async (open) => {
+  state.terminalPanelOpen = !!open;
+  const target = document.getElementById("terminal-workflows-panel");
+  if (!target) return;
+  if (!state.terminalPanelOpen) {
+    target.innerHTML = "";
+    setNodeVisible("terminal-workflows-panel", false);
+    return;
+  }
+  await Promise.all([fetchWatchlist(), fetchFilterPresets(), refreshAlerts()]);
+  target.innerHTML = "";
+  target.appendChild(renderTerminalPanel());
+  setNodeVisible("terminal-workflows-panel", true);
+};
+
+const setRoutecastVisible = (visible) => {
+  state.uiPrefs.show_routecast = !!visible;
+  setUiPrefs(state.uiPrefs);
+  setNodeVisible("terminal-routecast-wrap", state.uiPrefs.show_routecast);
+};
+
 const toggleRail = (side) => {
   if (side === "right" && !state.uiPrefs.show_sidebar) return;
   if (side === "left") state.layout.leftOpen = !state.layout.leftOpen;
@@ -1799,6 +1872,7 @@ const renderList = async (root) => {
   const panelsBtn = el(
     "button",
     {
+      id: "terminal-panels-btn",
       type: "button",
       class:
         "rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
@@ -1806,7 +1880,7 @@ const renderList = async (root) => {
       "aria-expanded": state.ui.panelsOpen ? "true" : "false",
       onclick: () => {
         state.ui.panelsOpen = !state.ui.panelsOpen;
-        render();
+        updatePanelsDropdown(state.ui.panelsOpen);
       },
     },
     ["Panels"]
@@ -1823,9 +1897,22 @@ const renderList = async (root) => {
       }),
     ]);
 
+  const dropdownCloseBtn = (label, onClick) =>
+    el(
+      "button",
+      {
+        type: "button",
+        class:
+          "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500",
+        onclick: onClick,
+      },
+      [label]
+    );
+
   const panelsMenu = el(
     "div",
     {
+      id: "terminal-panels-menu",
       class:
         "absolute right-0 z-30 mt-2 w-64 rounded-lg border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-800 dark:bg-slate-900",
       style: state.ui.panelsOpen ? "" : "display: none",
@@ -1837,18 +1924,14 @@ const renderList = async (root) => {
       }),
       panelItem("Filters (left section)", state.filtersOpen, (e) => {
         state.filtersOpen = !!e.target.checked;
-        render();
+        setNodeVisible("terminal-filters-panel", state.filtersOpen);
       }),
       panelItem("GreenLight (left section)", state.greenlightOpen, (e) => {
         state.greenlightOpen = !!e.target.checked;
-        render();
+        setNodeVisible("terminal-greenlight-panel", state.greenlightOpen);
       }),
       panelItem("Workflows (top/left)", state.terminalPanelOpen, async (e) => {
-        state.terminalPanelOpen = !!e.target.checked;
-        if (state.terminalPanelOpen) {
-          await Promise.all([fetchWatchlist(), fetchFilterPresets(), refreshAlerts()]);
-        }
-        render();
+        await setWorkflowsOpen(!!e.target.checked);
       }),
       panelItem("Context (right rail)", state.uiPrefs.show_sidebar && state.layout.rightOpen, (e) => {
         const next = !!e.target.checked;
@@ -1856,12 +1939,9 @@ const renderList = async (root) => {
         setUiPrefs(state.uiPrefs);
         state.layout.rightOpen = next;
         applyTerminalLayout();
-        render();
       }),
       panelItem("RouteCast (right section)", state.uiPrefs.show_routecast, (e) => {
-        state.uiPrefs.show_routecast = !!e.target.checked;
-        setUiPrefs(state.uiPrefs);
-        render();
+        setRoutecastVisible(!!e.target.checked);
       }),
       el("div", { class: "mt-3 flex flex-col gap-2" }, [
         el(
@@ -1873,7 +1953,7 @@ const renderList = async (root) => {
             onclick: () => {
               saveLayoutPrefs();
               state.ui.panelsOpen = false;
-              render();
+              updatePanelsDropdown(false);
             },
           },
           ["Save layout"]
@@ -1887,18 +1967,100 @@ const renderList = async (root) => {
             onclick: () => {
               resetLayoutPrefs();
               state.ui.panelsOpen = false;
-              render();
+              updatePanelsDropdown(false);
             },
           },
           ["Reset layout"]
         ),
       ]),
+      dropdownCloseBtn("Close", () => {
+        state.ui.panelsOpen = false;
+        updatePanelsDropdown(false);
+      }),
     ]
   );
 
   const panelsWrap = el("div", { class: "relative inline-flex" }, [panelsBtn, panelsMenu]);
 
-  const searchRow = el("div", { class: "flex items-start gap-2" }, [
+  const panelActionSlot = document.getElementById("terminal-panel-actions");
+  if (panelActionSlot) {
+    panelActionSlot.innerHTML = "";
+    panelActionSlot.appendChild(panelsWrap);
+  }
+
+  const settingsBtn = el(
+    "button",
+    {
+      id: "terminal-settings-btn",
+      type: "button",
+      class:
+        "rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
+      title: "Settings",
+      "aria-expanded": state.ui.settingsOpen ? "true" : "false",
+      onclick: () => {
+        state.ui.settingsOpen = !state.ui.settingsOpen;
+        updateSettingsDropdown(state.ui.settingsOpen);
+      },
+    },
+    ["Settings"]
+  );
+
+  const settingItem = (label, key) =>
+    el("label", { class: "flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300" }, [
+      el("span", {}, [label]),
+      el("input", {
+        type: "checkbox",
+        class: "h-4 w-4",
+        checked: state.uiPrefs[key] ? "checked" : undefined,
+        onchange: (e) => {
+          state.uiPrefs[key] = !!e.target.checked;
+          setUiPrefs(state.uiPrefs);
+          applyUiPrefsToShell();
+          if (key === "show_sidebar") applyTerminalLayout();
+          if (key === "greenlight_full_row") render();
+        },
+      }),
+    ]);
+
+  const settingsMenu = el(
+    "div",
+    {
+      id: "terminal-settings-menu",
+      class:
+        "absolute right-0 z-30 mt-2 w-64 rounded-lg border border-slate-200 bg-white p-3 shadow-lg dark:border-slate-800 dark:bg-slate-900",
+      style: state.ui.settingsOpen ? "" : "display: none",
+    },
+    [
+      settingItem("Show GreenLight ticker", "show_greenlight_ticker"),
+      settingItem("Show Freight Alerts ticker", "show_news_ticker"),
+      settingItem("Show sidebar", "show_sidebar"),
+      settingItem("GreenLight cards full row", "greenlight_full_row"),
+      el("div", { class: "mt-3 flex flex-col gap-2" }, [
+        el(
+          "a",
+          {
+            href: "#/settings",
+            class:
+              "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 text-center hover:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300",
+          },
+          ["Full settings"]
+        ),
+      ]),
+      dropdownCloseBtn("Close", () => {
+        state.ui.settingsOpen = false;
+        updateSettingsDropdown(false);
+      }),
+    ]
+  );
+
+  const settingsWrap = el("div", { class: "relative inline-flex" }, [settingsBtn, settingsMenu]);
+  const settingsSlot = document.getElementById("terminal-settings-actions");
+  if (settingsSlot) {
+    settingsSlot.innerHTML = "";
+    settingsSlot.appendChild(settingsWrap);
+  }
+
+  const searchRow = el("div", { class: "flex gap-2" }, [
     el("input", {
       class:
         "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-800 dark:bg-slate-900",
@@ -1908,21 +2070,18 @@ const renderList = async (root) => {
         state.query.q = e.target.value;
       },
     }),
-    el("div", { class: "flex shrink-0 flex-col gap-2" }, [
-      el(
-        "button",
-        {
-          class:
-            "rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
-          onclick: () => {
-            state.listPage = 0;
-            render();
-          },
+    el(
+      "button",
+      {
+        class:
+          "shrink-0 rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
+        onclick: () => {
+          state.listPage = 0;
+          render();
         },
-        ["Search"]
-      ),
-      panelsWrap,
-    ]),
+      },
+      ["Search"]
+    ),
   ]);
 
   top.appendChild(searchRow);
@@ -2444,7 +2603,9 @@ const renderTerminalPanel = () => {
   });
 
   // Section: Save Filter Preset
-  const presetSection = el("div", { class: "space-y-2" });
+  const presetSection = el("div", {
+    class: "space-y-3 text-sm font-semibold",
+  });
   presetSection.appendChild(
     el("div", { class: "text-sm font-semibold text-sky-700 dark:text-sky-400" }, ["💾 Save Filter Preset"])
   );
@@ -2476,36 +2637,51 @@ const renderTerminalPanel = () => {
 
   // Show saved presets
   if (state.filterPresets.length > 0) {
-    const presetList = el("div", { class: "flex flex-wrap gap-2 pt-1" });
+    const presetList = el("div", { class: "space-y-2" });
     for (const preset of state.filterPresets) {
       presetList.appendChild(
-        el("div", { class: "flex items-center gap-1 rounded bg-slate-200 dark:bg-slate-700 px-2 py-1 text-xs" }, [
-          el("span", { class: "text-slate-700 dark:text-slate-200" }, [preset.name]),
-          el(
-            "button",
-            {
-              class:
-                "ml-1 rounded border border-sky-500 bg-sky-50 px-2 py-0.5 text-[0.7rem] font-medium text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-400",
-              title: "Apply preset and run Search",
-              onclick: () => loadFilterPreset(preset),
-            },
-            ["Apply now"]
-          ),
-          el(
-            "button",
-            {
-              class: "text-red-500 hover:text-red-700 ml-1",
-              onclick: () => deleteFilterPreset(preset.id),
-            },
-            ["×"]
-          ),
-        ])
+        el(
+          "div",
+          {
+            class:
+              "rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900",
+          },
+          [
+            el(
+              "div",
+              { class: "flex items-center justify-between gap-3" },
+              [
+                el("div", { class: "min-w-0 font-semibold text-slate-900 dark:text-slate-100" }, [preset.name]),
+                el("div", { class: "flex items-center gap-2" }, [
+                  el(
+                    "button",
+                    {
+                      class:
+                        "rounded border border-sky-500 bg-sky-50 px-2 py-0.5 text-[0.65rem] font-medium text-sky-700 dark:border-sky-600 dark:bg-slate-900/30 dark:text-sky-400",
+                      title: "Apply preset and run Search",
+                      onclick: () => loadFilterPreset(preset),
+                    },
+                    ["Apply"]
+                  ),
+                  el(
+                    "button",
+                    {
+                      class: "text-red-500 hover:text-red-700",
+                      title: "Delete preset",
+                      onclick: () => deleteFilterPreset(preset.id),
+                    },
+                    ["×"]
+                  ),
+                ]),
+              ]
+            ),
+          ]
+        )
       );
     }
     presetSection.appendChild(presetList);
   }
   wrap.appendChild(presetSection);
-
   // Section: Watchlist summary
   const watchlistSection = el("div", { class: "space-y-2" });
   watchlistSection.appendChild(
@@ -3339,4 +3515,5 @@ window.addEventListener("resize", () => {
   });
 });
 setMeta().then(render);
+refreshAlerts().catch((e) => console.error("alert refresh failed", e));
 initNewsTicker();
