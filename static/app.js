@@ -2490,23 +2490,23 @@ const renderList = async (root) => {
     class: "h-2 w-2 rounded-full bg-slate-600 dark:bg-slate-300 transition",
     style: "visibility: hidden;",
   });
-  const statusText = el("span", { class: "text-xs font-semibold text-slate-700 dark:text-slate-300" }, [
+  const statusText = el("span", { class: "text-left text-xs font-semibold text-slate-700 dark:text-slate-300" }, [
     "Results update on Search and Sort.",
   ]);
   const statusMeta = el("span", { class: "text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" }, [
     "",
   ]);
-  const statusRow = el("div", { class: "flex items-center gap-2" }, [statusSpinner, statusText, statusMeta]);
+  const statusRow = el("div", { class: "flex items-center gap-2 justify-start" }, [statusSpinner, statusText, statusMeta]);
 
   const setStatusLoading = () => {
     statusSpinner.style.visibility = "visible";
     statusText.textContent = "Searching loads…";
-    statusMeta.textContent = state.listTotal ? formatLoadCount(state.listTotal) : "";
+    statusMeta.textContent = "";
   };
   const setStatusIdle = (total) => {
     statusSpinner.style.visibility = "hidden";
     statusText.textContent = "Results update on Search and Sort.";
-    statusMeta.textContent = total > 0 ? formatLoadCount(total) : "No matches";
+    statusMeta.textContent = "";
   };
   const setStatusError = (message) => {
     statusSpinner.style.visibility = "hidden";
