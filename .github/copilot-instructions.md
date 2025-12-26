@@ -37,6 +37,22 @@
   - This script stages+commits ALL changes (including untracked), pushes `main`, SSHes to the server, resets to `origin/main`, and touches `tmp/restart.txt`.
   - Default behavior: when the user says “deploy”, run this (don’t ask for the command again unless they specify a different target).
 
+## PR workflow (default)
+
+You have permission to create branches and open draft PRs in this repo.
+
+Do not ask “Should I open a PR?” or any similar question.
+Instead, when work is complete:
+1) Create a branch with a reasonable name.
+2) Commit changes with a clean message.
+3) Push the branch.
+4) Open a DRAFT PR targeting main (unless otherwise specified).
+5) Output: branch name, commit hash, PR title, PR link, and the exact PR description.
+
+Only ask a question if you are blocked by missing information (e.g., base branch unknown).
+
+No opportunistic fixes. If a change is not required for the stated PR objective, do not include it.
+
 ## Agent vs. Long-form manifesto
 - The short `Sage` agent in `.github/agents/Sage.agent.md` distills the behavior Copilot should follow when you select it.
 - The longer manifesto you wrote lives in `.github/Sage_chatmode.md`; treat it as the canonical spec (ingestion, scoring, observability, UI guardrails) and sync the agent with it whenever that doc changes.
