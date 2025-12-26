@@ -481,6 +481,7 @@ const state = {
   mapInstance: null,
   detailLoadId: "",
   detailLoad: null,
+  detailRenderToken: 0,
 
   routecast: {
     loadId: "",
@@ -1463,6 +1464,21 @@ const renderMiniRoutePreview = ({ loadId, origin, destination, stops, routeGeome
   return wrap;
 };
 
+const renderConusRouteMiniMap = ({ origin, destination, isGreenlight = false, className = "" } = {}) => {
+  if (typeof ConusRouteMiniMap !== "function") return null;
+  const normalizedOrigin = normalizeRoutePoint(origin);
+  const normalizedDestination = normalizeRoutePoint(destination);
+  if (!normalizedOrigin || !normalizedDestination) return null;
+  return ConusRouteMiniMap({
+    originLat: normalizedOrigin?.lat ?? null,
+    originLon: normalizedOrigin?.lon ?? null,
+    destLat: normalizedDestination?.lat ?? null,
+    destLon: normalizedDestination?.lon ?? null,
+    isGreenlight: !!isGreenlight,
+    className,
+  });
+};
+
 const detailRenderStats = {
   count: 0,
   lastLoadId: "",
@@ -2397,8 +2413,12 @@ const render = async () => {
     // Keep shell-level UI (tickers/padding) in sync with settings.
     applyUiPrefsToShell();
     const route = getHashRoute();
-    if (route.page === "settings") return await renderSettings(root);
+    if (route.page === "settings") {
+      state.detailRenderToken += 1;
+      return await renderSettings(root);
+    }
     if (route.page === "load" && route.id) return await renderDetail(root, route.id);
+    state.detailRenderToken += 1;
     return await renderList(root);
   } catch (err) {
     console.error("Render failed:", err);
@@ -2589,8 +2609,18 @@ const renderLoadGrid = (loads) => {
       [isWatched ? "★" : "☆"]
     );
 
-    const showMiniRoutePreview = state.uiPrefs.greenlight_full_row && greenlightOk;
-    const miniRoutePreview = showMiniRoutePreview
+    const showFullRow = state.uiPrefs.greenlight_full_row && greenlightOk;
+    const hasValidCoords = !!(normalizeRoutePoint(load.origin) && normalizeRoutePoint(load.destination));
+    const canRenderMiniMap = showFullRow && hasValidCoords;
+    const conusRouteMiniMap = canRenderMiniMap
+      ? renderConusRouteMiniMap({
+          origin: load.origin,
+          destination: load.destination,
+          isGreenlight: greenlightOk,
+          className: "hidden lg:flex self-stretch min-h-[88px]",
+        })
+      : null;
+    const miniRoutePreview = showFullRow && !canRenderMiniMap
       ? renderMiniRoutePreview({
           loadId: load.id,
           origin: load.origin,
@@ -2609,13 +2639,20 @@ const renderLoadGrid = (loads) => {
           [
             "block rounded-lg border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 relative",
             "min-h-[130px]",
-            state.uiPrefs.greenlight_full_row && greenlightOk ? "lg:col-span-2" : "",
+            showFullRow ? "lg:col-span-2" : "",
           ]
             .filter(Boolean)
             .join(" "),
       },
       [
-        el("div", { class: "flex items-start justify-between gap-2" }, [
+        el(
+          "div",
+          {
+            class: showFullRow
+              ? "flex items-start justify-between gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)_auto] lg:items-center lg:gap-3"
+              : "flex items-start justify-between gap-2",
+          },
+          [
           el("div", { class: "min-w-0 flex-1" }, [
             el("div", { class: "flex items-center gap-2" }, [
               el("div", { class: routeClass }, [
@@ -2647,7 +2684,7 @@ const renderLoadGrid = (loads) => {
             ]),
           ].filter(Boolean)),
 
-          miniRoutePreview,
+          conusRouteMiniMap || miniRoutePreview,
 
           el("div", { class: "flex flex-col items-end justify-between self-stretch text-right" }, [
             el("div", { class: "flex flex-col items-end gap-1" }, [
@@ -2658,7 +2695,8 @@ const renderLoadGrid = (loads) => {
               ]),
             ].filter(Boolean)),
           ]),
-        ]),
+        ]
+        ),
         el(
           "div",
           { class: "absolute bottom-3 right-3" },
@@ -4023,6 +4061,8 @@ const renderFiltersPanel = () => {
 };
 
 const renderDetail = async (root, id) => {
+  const renderToken = ++state.detailRenderToken;
+  const isStale = () => renderToken !== state.detailRenderToken;
   let load;
   try {
     load = await apiGet(`/api/loads/${id}`);
@@ -4033,6 +4073,7 @@ const renderDetail = async (root, id) => {
     renderFatalError(root, "Load not found", "That load ID is missing (try going back to the list).");
     return;
   }
+  if (isStale()) return;
 
   detailRenderStats.count += 1;
   mapDebug("Detail render", {
@@ -4054,9 +4095,11 @@ const renderDetail = async (root, id) => {
   } catch (err) {
     console.error("Failed to fetch score:", err);
   }
+  if (isStale()) return;
 
   // Check watchlist status
   await fetchWatchlist();
+  if (isStale()) return;
   const isWatched = state.watchlist.has(id);
 
   // GreenLight verdict for this load
@@ -4264,6 +4307,7 @@ const renderDetail = async (root, id) => {
     return el("div", { class: "mt-3" }, [panel]);
   })();
 
+  if (isStale()) return;
   root.appendChild(back);
   if (layoutMode === "single") {
     const tabs = el("div", { class: "mt-3 inline-flex gap-1 rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900" }, [
