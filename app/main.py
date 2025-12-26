@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import random
+from functools import lru_cache
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +38,7 @@ from .api_models import (
     FilterPresetCreateRequest,
     FilterPresetModel,
     FilterPresetsResponse,
+    LoadRouteResponse,
     PreferencesModel,
     PreferencesResponse,
     RouteCastScoreRequest,
@@ -914,6 +916,51 @@ def get_load(load_id: str, ctx: AppContext = Depends(get_ctx)) -> dict[str, Any]
         if load.id == load_id:
             return load.model_dump(mode="json")
     raise HTTPException(status_code=404, detail="Load not found")
+
+
+@lru_cache(maxsize=512)
+def _lookup_route_coords(
+    origin_city: str,
+    origin_state: str,
+    destination_city: str,
+    destination_state: str,
+) -> tuple[float, float, float, float]:
+    origin = geocode_city_state(origin_city, origin_state)
+    destination = geocode_city_state(destination_city, destination_state)
+    return (
+        float(origin["lat"]),
+        float(origin["lon"]),
+        float(destination["lat"]),
+        float(destination["lon"]),
+    )
+
+
+@app.get("/api/loads/{load_id}/route", response_model=LoadRouteResponse)
+def get_load_route(load_id: str, ctx: AppContext = Depends(get_ctx)) -> LoadRouteResponse:
+    load: Load | None = None
+    for l in _active_loads(ctx):
+        if l.id == load_id:
+            load = l
+            break
+    if load is None:
+        raise HTTPException(status_code=404, detail="Load not found")
+
+    try:
+        o_lat, o_lon, d_lat, d_lon = _lookup_route_coords(
+            load.origin.city,
+            load.origin.state,
+            load.destination.city,
+            load.destination.state,
+        )
+    except (ValueError, LookupError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return LoadRouteResponse(
+        load_id=load.id,
+        origin=CoordinateModel(lat=o_lat, lon=o_lon),
+        destination=CoordinateModel(lat=d_lat, lon=d_lon),
+        stops=[],
+    )
 
 
 @app.get("/api/loads/{load_id}/trust", response_model=TrustResponse)

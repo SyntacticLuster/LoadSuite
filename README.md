@@ -36,6 +36,17 @@ poetry run python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8035
 - For LAN testing, browse to `http://<your-lan-ip>:8035` from another device.
 - The FastAPI backend lives under `app/`, static assets under `static/`, and the UI HTML entrypoint is `static/index.html`.
 
+## Map configuration (Load Details)
+
+The Load Details map uses Leaflet with a dark tile layer by default. To override tiles, set globals in `static/index.html` before `static/app.js`:
+
+```html
+<script>
+  window.LB_MAP_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+  window.LB_MAP_TILE_ATTRIBUTION = "© OpenStreetMap © CARTO";
+</script>
+```
+
 ## CLI utilities
 
 The CLI reads any JSON/CSV following the schema in `sample_data/` and supports the same filters/sort options as the web UI.

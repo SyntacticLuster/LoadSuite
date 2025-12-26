@@ -31,6 +31,13 @@ class CoordinateModel(BaseModel):
     lon: float
 
 
+class LoadRouteResponse(BaseModel):
+    load_id: str
+    origin: CoordinateModel
+    destination: CoordinateModel
+    stops: List[CoordinateModel] = Field(default_factory=list)
+
+
 class RouteCastScoreRequest(BaseModel):
     origin: CoordinateModel
     destination: CoordinateModel

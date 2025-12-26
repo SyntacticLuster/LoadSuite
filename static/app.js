@@ -237,6 +237,12 @@ const apiGet = async (path) => {
   return await res.json();
 };
 
+const apiGetWithSignal = async (path, signal) => {
+  const res = await fetch(toAppUrl(path), { signal });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return await res.json();
+};
+
 const apiPostJson = async (path, body) => {
   const res = await fetch(toAppUrl(path), {
     method: "POST",
@@ -452,6 +458,12 @@ const state = {
   searchRequestId: 0,
   activeSearchRequestId: 0,
   hasLoadedResults: false,
+  routeLookup: { loadId: "", loading: false, error: "", data: null },
+  routeAbort: null,
+  routeCache: new Map(),
+  mapInstance: null,
+  detailLoadId: "",
+  detailLoad: null,
 
   routecast: {
     loadId: "",
@@ -480,6 +492,13 @@ const state = {
 const WEATHER_FORECAST_TTL_MS = 10 * 60 * 1000;
 const WEATHER_ALERTS_TTL_MS = 2 * 60 * 1000;
 const ROUTECAST_TTL_MS = 2 * 60 * 1000;
+const ROUTE_CACHE_MAX = 50;
+const MAP_TILE_URL_DEFAULT = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const MAP_TILE_ATTRIBUTION_DEFAULT = "© OpenStreetMap © CARTO";
+const isMapDebugEnabled = () => typeof window !== "undefined" && !!window.LB_DEBUG_MAP;
+const mapDebug = (...args) => {
+  if (isMapDebugEnabled()) console.debug(...args);
+};
 
 const _normalizeZip = (raw) => {
   const s = String(raw ?? "").trim();
@@ -785,6 +804,26 @@ const renderWeatherSidebar = () => {
   ].filter(Boolean));
 };
 
+const updateRouteCastPanels = (loadId, { load } = {}) => {
+  let updated = false;
+  const terminalWrap = document.getElementById("terminal-routecast-wrap");
+  if (terminalWrap && state.uiPrefs.show_routecast) {
+    terminalWrap.innerHTML = "";
+    const widget = renderRouteCastWidget(loadId, { compact: true });
+    if (widget) terminalWrap.appendChild(widget);
+    updated = true;
+  }
+
+  const detailPanel = document.getElementById("routecast-panel-detail");
+  if (detailPanel) {
+    const widget = renderRouteCastWidget(loadId, { compact: false, load, panelId: "routecast-panel-detail" });
+    detailPanel.replaceWith(widget);
+    updated = true;
+  }
+
+  return updated;
+};
+
 const fetchRouteCast = async (loadId) => {
   const id = String(loadId || "").trim();
   if (!id) return;
@@ -813,11 +852,12 @@ const fetchRouteCast = async (loadId) => {
     state.routecast.error = err?.message || String(err);
   } finally {
     state.routecast.fetching = false;
-    render();
+    const detailLoad = state.detailLoadId === id ? state.detailLoad : null;
+    if (!updateRouteCastPanels(id, { load: detailLoad })) render();
   }
 };
 
-const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) => {
+const renderRouteCastWidget = (loadId, { compact, load, panelId } = { compact: false }) => {
   const id = String(loadId || "").trim();
   const isCollapsed = !!state.ui.collapseRouteCast;
   const rc = state.routecast.loadId === id ? state.routecast.data : null;
@@ -896,6 +936,7 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
     },
     [titleRow]
   );
+  if (panelId) wrap.id = panelId;
 
   const bodyWrap = el("div", { id: bodyId }, []);
   bodyWrap.style.display = isCollapsed ? "none" : "";
@@ -1006,26 +1047,316 @@ const renderRouteCastWidget = (loadId, { compact, load } = { compact: false }) =
   return wrap;
 };
 
-const renderMapPanel = ({ origin, destination, polyline } = {}) => {
+let leafletPromise = null;
+
+const getMapTileUrl = () => {
+  if (typeof window === "undefined") return MAP_TILE_URL_DEFAULT;
+  return window.LB_MAP_TILE_URL || MAP_TILE_URL_DEFAULT;
+};
+
+const getMapTileAttribution = () => {
+  if (typeof window === "undefined") return MAP_TILE_ATTRIBUTION_DEFAULT;
+  return window.LB_MAP_TILE_ATTRIBUTION || MAP_TILE_ATTRIBUTION_DEFAULT;
+};
+
+const ensureLeaflet = () => {
+  if (typeof window === "undefined") return Promise.reject(new Error("Leaflet requires a browser"));
+  if (window.L) return Promise.resolve(window.L);
+  if (leafletPromise) return leafletPromise;
+
+  // Leaflet is a small dependency with built-in polyline + fitBounds.
+  leafletPromise = new Promise((resolve, reject) => {
+    const existing = document.getElementById("leaflet-js");
+    const onReady = () => {
+      if (window.L) resolve(window.L);
+      else {
+        leafletPromise = null;
+        reject(new Error("Leaflet failed to initialize"));
+      }
+    };
+
+    if (!document.getElementById("leaflet-css")) {
+      const css = document.createElement("link");
+      css.id = "leaflet-css";
+      css.rel = "stylesheet";
+      css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      css.onerror = () => console.error("Failed to load Leaflet CSS");
+      document.head.appendChild(css);
+    }
+
+    if (existing) {
+      existing.addEventListener("load", onReady, { once: true });
+      existing.addEventListener("error", () => {
+        leafletPromise = null;
+        reject(new Error("Leaflet failed to load"));
+      }, { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "leaflet-js";
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.async = true;
+    script.onload = onReady;
+    script.onerror = () => {
+      leafletPromise = null;
+      reject(new Error("Leaflet failed to load"));
+    };
+    document.head.appendChild(script);
+  });
+
+  return leafletPromise;
+};
+
+const getRouteCache = (loadId) => {
+  const id = String(loadId || "").trim();
+  if (!id) return null;
+  const cached = state.routeCache.get(id);
+  if (!cached) return null;
+  state.routeCache.delete(id);
+  state.routeCache.set(id, cached);
+  return cached;
+};
+
+const setRouteCache = (loadId, data) => {
+  const id = String(loadId || "").trim();
+  if (!id || !data) return;
+  if (state.routeCache.has(id)) state.routeCache.delete(id);
+  state.routeCache.set(id, data);
+  if (state.routeCache.size > ROUTE_CACHE_MAX) {
+    const oldest = state.routeCache.keys().next().value;
+    state.routeCache.delete(oldest);
+  }
+};
+
+const normalizeRoutePoint = (point) => {
+  if (!point) return null;
+  const lat = Number(point.lat);
+  const lon = Number(point.lon ?? point.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return { lat, lon };
+};
+
+const buildRoutePoints = (routeData, polyline) => {
+  // Prefer explicit polyline points; fall back to origin/stops/destination.
+  const polyPoints = Array.isArray(polyline)
+    ? polyline.map((p) => {
+        if (Array.isArray(p) && p.length >= 2) return normalizeRoutePoint({ lat: p[0], lon: p[1] });
+        return normalizeRoutePoint(p);
+      }).filter(Boolean)
+    : [];
+
+  if (polyPoints.length >= 2) return polyPoints;
+
+  if (!routeData) return [];
+  const points = [];
+  const origin = normalizeRoutePoint(routeData.origin);
+  const destination = normalizeRoutePoint(routeData.destination);
+  if (origin) points.push(origin);
+  const stops = Array.isArray(routeData.stops) ? routeData.stops : [];
+  for (const stop of stops) {
+    const normalized = normalizeRoutePoint(stop);
+    if (normalized) points.push(normalized);
+  }
+  if (destination) points.push(destination);
+  return points;
+};
+
+const buildRouteKey = (points) =>
+  points.map((p) => `${p.lat.toFixed(4)},${p.lon.toFixed(4)}`).join("|");
+
+const detailRenderStats = {
+  count: 0,
+  lastLoadId: "",
+  lastLoadRef: null,
+};
+
+const teardownMapInstance = (reason) => {
+  if (!state.mapInstance) return;
+  if (state.mapInstance.resizeObserver) {
+    try {
+      state.mapInstance.resizeObserver.disconnect();
+    } catch {}
+  }
+  try {
+    state.mapInstance.map.remove();
+  } catch {}
+  mapDebug("Map teardown", { reason, containerId: state.mapInstance.containerId });
+  state.mapInstance = null;
+};
+
+const shouldRebuildMapInstance = (mapInstance, container) => {
+  if (!mapInstance || !mapInstance.map || !container) return false;
+  const mapContainer = mapInstance.map.getContainer ? mapInstance.map.getContainer() : null;
+  if (!mapContainer || !mapContainer.isConnected) return true;
+  return mapContainer !== container;
+};
+
+const attachMapResizeObserver = (map, container) => {
+  if (typeof ResizeObserver === "undefined" || !map || !container) return null;
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.contentRect.width || !entry.contentRect.height) continue;
+      try {
+        map.invalidateSize();
+      } catch {}
+    }
+  });
+  observer.observe(container);
+  return observer;
+};
+
+const renderLeafletMap = async (containerId, routeData, polyline) => {
+  const container = document.getElementById(containerId);
+  if (!container || !routeData) return;
+
+  const points = buildRoutePoints(routeData, polyline);
+  if (points.length < 2) {
+    state.routeLookup = { ...state.routeLookup, error: "missing_coords", loading: false };
+    render();
+    return;
+  }
+
+  try {
+    const L = await ensureLeaflet();
+    if (!document.getElementById(containerId)) return;
+
+    const routeKey = buildRouteKey(points);
+    if (state.mapInstance && state.mapInstance.containerId !== containerId) {
+      teardownMapInstance("container_id_changed");
+    }
+
+    if (shouldRebuildMapInstance(state.mapInstance, container)) {
+      teardownMapInstance("container_detached");
+    }
+
+    if (state.mapInstance && state.mapInstance.routeKey === routeKey) {
+      state.mapInstance.map.invalidateSize();
+      return;
+    }
+
+    if (state.mapInstance) {
+      teardownMapInstance("route_changed");
+    }
+
+    const map = L.map(container, {
+      zoomControl: true,
+      attributionControl: true,
+      scrollWheelZoom: false,
+    });
+    const tileLayer = L.tileLayer(getMapTileUrl(), {
+      attribution: getMapTileAttribution(),
+      maxZoom: 18,
+    }).addTo(map);
+
+    tileLayer.on("tileerror", () => {
+      if (state.routeLookup.loadId === routeData.load_id) {
+        state.routeLookup = { ...state.routeLookup, error: "provider_error", loading: false, data: routeData };
+        render();
+      }
+    });
+
+    const line = L.polyline(points.map((p) => [p.lat, p.lon]), {
+      color: "#38bdf8",
+      weight: 3,
+      opacity: 0.9,
+    }).addTo(map);
+
+    const markers = [
+      L.circleMarker([points[0].lat, points[0].lon], {
+        radius: 6,
+        color: "#34d399",
+        fillColor: "#34d399",
+        fillOpacity: 0.9,
+      }).addTo(map),
+      L.circleMarker([points[points.length - 1].lat, points[points.length - 1].lon], {
+        radius: 6,
+        color: "#f59e0b",
+        fillColor: "#f59e0b",
+        fillOpacity: 0.9,
+      }).addTo(map),
+    ];
+
+    map.fitBounds(line.getBounds(), { padding: [24, 24] });
+    const resizeObserver = attachMapResizeObserver(map, container);
+    state.mapInstance = { map, tileLayer, line, markers, routeKey, containerId, resizeObserver };
+  } catch (err) {
+    console.error("Map render failed:", err);
+    if (state.routeLookup.loadId === routeData.load_id) {
+      state.routeLookup = { ...state.routeLookup, error: "provider_error", loading: false, data: routeData };
+      render();
+    }
+  }
+};
+
+const renderMapPanel = ({ loadId, origin, destination, polyline } = {}) => {
   const originLabel = origin ? `${origin.city}, ${origin.state}` : "Origin";
   const destinationLabel = destination ? `${destination.city}, ${destination.state}` : "Destination";
-  const body = el("div", { class: "pt-3 space-y-3" }, [
-    el("div", { class: "text-xs text-slate-600 dark:text-slate-400" }, [
-      "Map placeholder",
-    ]),
-    el("div", { class: "grid gap-2 text-xs text-slate-700 dark:text-slate-300" }, [
-      el("div", {}, [el("span", { class: "font-semibold" }, ["Origin"]), ` ${originLabel}`]),
-      el("div", {}, [el("span", { class: "font-semibold" }, ["Destination"]), ` ${destinationLabel}`]),
-    ]),
-    el(
-      "div",
-      {
-        class:
-          "flex min-h-[320px] items-center justify-center rounded-lg border border-dashed border-slate-300/70 bg-slate-50/60 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-400",
-      },
-      ["Map will render here"]
-    ),
-  ]);
+  const activeRoute = state.routeLookup.loadId === loadId ? state.routeLookup : { loadId, loading: false, error: "", data: null };
+  const mapId = `load-map-${loadId || "unknown"}`;
+
+  const shouldRenderMap = !activeRoute.loading && !activeRoute.error && activeRoute.data;
+  if (shouldRenderMap) {
+    requestAnimationFrame(() => {
+      const container = document.getElementById(mapId);
+      if (!container) return;
+      if (isMapDebugEnabled()) {
+        const rect = container.getBoundingClientRect();
+        const points = buildRoutePoints(activeRoute.data, polyline);
+        mapDebug("Map panel render", {
+          loadId,
+          mapId,
+          points: points.length,
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+      renderLeafletMap(mapId, activeRoute.data, polyline);
+    });
+  }
+
+  const overlayMessage = activeRoute.error === "missing_coords"
+    ? "No coordinates available for this load."
+    : activeRoute.error
+      ? "Map unavailable (provider error)."
+      : activeRoute.loading
+        ? "Rendering map…"
+        : "";
+
+  const overlay = overlayMessage
+    ? el(
+        "div",
+        {
+          class:
+            "absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-slate-950/70 text-center text-sm text-slate-200",
+        },
+        [
+          el("div", {}, [overlayMessage]),
+          activeRoute.error && activeRoute.error !== "missing_coords"
+            ? el(
+                "button",
+                {
+                  class:
+                    "rounded-md border border-slate-400 px-2 py-1 text-xs font-semibold text-slate-200 hover:border-slate-200",
+                  onclick: () => {
+                    if (loadId) fetchLoadRoute(loadId, { force: true, renderOnStart: true });
+                  },
+                },
+                ["Retry"]
+              )
+            : null,
+        ].filter(Boolean)
+      )
+    : null;
+
+  const mapSurface = el(
+    "div",
+    { class: "relative overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800" },
+    [
+      el("div", { id: mapId, class: "h-[420px] w-full bg-slate-950" }),
+      overlay,
+    ].filter(Boolean)
+  );
 
   return el(
     "div",
@@ -1038,7 +1369,10 @@ const renderMapPanel = ({ origin, destination, polyline } = {}) => {
         el("div", { class: "text-sm font-semibold text-slate-900 dark:text-slate-100" }, ["Map"]),
         polyline ? el("div", { class: "text-xs text-slate-500 dark:text-slate-400" }, ["Route preview"]) : null,
       ].filter(Boolean)),
-      body,
+      el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, [
+        `${originLabel} → ${destinationLabel}`,
+      ]),
+      el("div", { class: "pt-3" }, [mapSurface]),
     ]
   );
 };
@@ -1065,6 +1399,68 @@ const apiDelete = async (path) => {
   const res = await fetch(toAppUrl(path), { method: "DELETE" });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return await res.json();
+};
+
+const _normalizeRoutePayload = (payload) => {
+  const origin = normalizeRoutePoint(payload?.origin);
+  const destination = normalizeRoutePoint(payload?.destination);
+  if (!origin || !destination) return null;
+  const stops = Array.isArray(payload?.stops) ? payload.stops.map(normalizeRoutePoint).filter(Boolean) : [];
+  return {
+    load_id: payload?.load_id || "",
+    origin,
+    destination,
+    stops,
+  };
+};
+
+const fetchLoadRoute = async (loadId, { force = false, renderOnStart = false } = {}) => {
+  const id = String(loadId || "").trim();
+  if (!id) return;
+
+  if (!force) {
+    const cached = getRouteCache(id);
+    if (cached) {
+      state.routeLookup = { loadId: id, loading: false, error: "", data: cached };
+      return;
+    }
+    if (state.routeLookup.loading && state.routeLookup.loadId === id) return;
+    if (state.routeLookup.data && state.routeLookup.loadId === id) return;
+  }
+
+  if (state.routeAbort) {
+    try {
+      state.routeAbort.abort();
+    } catch {}
+  }
+
+  const controller = new AbortController();
+  state.routeAbort = controller;
+  state.routeLookup = { loadId: id, loading: true, error: "", data: null };
+  if (renderOnStart) render();
+
+  try {
+    const payload = await apiGetWithSignal(`/api/loads/${encodeURIComponent(id)}/route`, controller.signal);
+    if (state.routeLookup.loadId !== id) return;
+    const normalized = _normalizeRoutePayload(payload);
+    if (!normalized) {
+      state.routeLookup = { loadId: id, loading: false, error: "missing_coords", data: null };
+      render();
+      return;
+    }
+    setRouteCache(id, normalized);
+    state.routeLookup = { loadId: id, loading: false, error: "", data: normalized };
+    render();
+  } catch (err) {
+    if (err?.name === "AbortError") return;
+    if (state.routeLookup.loadId !== id) return;
+    const status = String(err?.message || "");
+    const errorType = status.startsWith("400") ? "missing_coords" : "provider_error";
+    state.routeLookup = { loadId: id, loading: false, error: errorType, data: null };
+    render();
+  } finally {
+    if (state.routeAbort === controller) state.routeAbort = null;
+  }
 };
 
 const fetchScoredLoads = async () => {
@@ -3217,6 +3613,18 @@ const renderDetail = async (root, id) => {
     renderFatalError(root, "Load not found", "That load ID is missing (try going back to the list).");
     return;
   }
+
+  detailRenderStats.count += 1;
+  mapDebug("Detail render", {
+    count: detailRenderStats.count,
+    loadId: id,
+    sameLoadId: detailRenderStats.lastLoadId === id,
+    sameLoadRef: detailRenderStats.lastLoadRef === load,
+  });
+  detailRenderStats.lastLoadId = id;
+  detailRenderStats.lastLoadRef = load;
+  state.detailLoadId = id;
+  state.detailLoad = load;
   
   // Fetch score for this load
   let scoreData = null;
@@ -3368,9 +3776,15 @@ const renderDetail = async (root, id) => {
     },
     [leftCol]
   );
-  const routecastPanel = renderRouteCastWidget(id, { compact: false, load });
-  const mapPanel = renderMapPanel({ origin: load.origin, destination: load.destination, polyline: null });
   const layoutMode = getDetailLayoutMode();
+  const isMapVisible = layoutMode !== "single" || state.ui.detailTab === "map";
+
+  if (isMapVisible) {
+    void fetchLoadRoute(id);
+  }
+
+  const routecastPanel = renderRouteCastWidget(id, { compact: false, load, panelId: "routecast-panel-detail" });
+  const mapPanel = renderMapPanel({ loadId: id, origin: load.origin, destination: load.destination, polyline: null });
 
   if (layoutMode === "single" && !state.ui.detailTab) {
     state.ui.detailTab = "facts";

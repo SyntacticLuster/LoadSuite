@@ -204,6 +204,31 @@ Get detailed information for a single load.
 
 ---
 
+#### GET /api/loads/{load_id}/route
+
+Return route coordinates for a load (origin/destination + optional stops).
+
+**Response:**
+
+```json
+{
+  "load_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "origin": { "lat": 33.7489, "lon": -84.3881 },
+  "destination": { "lat": 41.8781, "lon": -87.6298 },
+  "stops": []
+}
+```
+
+**Status Codes:**
+
+| Code | Description |
+|------|-------------|
+| 200 | Success |
+| 400 | City/state not supported |
+| 404 | Load not found |
+
+---
+
 ### Data Management
 
 #### POST /api/refresh
