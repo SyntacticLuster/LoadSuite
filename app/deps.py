@@ -6,8 +6,10 @@ from .app_context import AppContext
 from .config import settings
 from .ingestion.manager import IngestionManager
 from .routecast_cache import RouteCastCache
+from .routing_cache import RoutingCache
 from .scoring import ScoringEngine
 from .services.routecast_client import RouteCastClient
+from .services.routing_client import RoutingClient
 
 
 def get_ctx(request: Request) -> AppContext:
@@ -43,3 +45,25 @@ def get_routecast_client(ctx: AppContext = Depends(get_ctx)) -> RouteCastClient 
             api_key=settings.routecast_api_key,
         )
     return ctx.routecast_client
+
+
+def get_routing_client(ctx: AppContext = Depends(get_ctx)) -> RoutingClient | None:
+    if not settings.routing_provider or not settings.routing_base_url:
+        return None
+
+    if ctx.routing_client is None:
+        cache = ctx.routing_cache or RoutingCache(
+            ttl_seconds=settings.routing_cache_ttl_seconds,
+            negative_ttl_seconds=settings.routing_negative_cache_ttl_seconds,
+            max_entries=settings.routing_cache_max_entries,
+        )
+        ctx.routing_cache = cache
+        ctx.routing_client = RoutingClient(
+            base_url=settings.routing_base_url,
+            timeout_seconds=settings.routing_timeout_seconds,
+            provider=settings.routing_provider,
+            profile=settings.routing_profile,
+            cache=cache,
+            max_retries=settings.routing_max_retries,
+        )
+    return ctx.routing_client

@@ -165,6 +165,46 @@ class Settings(BaseSettings):
         default=None,
         description="RouteCast API key for Authorization header (env: ROUTECAST_API_KEY)",
     )
+
+    # Routing (map geometry)
+    routing_provider: str = Field(
+        default="osrm",
+        description="Routing provider name (env: ROUTING_PROVIDER)",
+    )
+    routing_base_url: str = Field(
+        default="https://router.project-osrm.org",
+        description="Routing provider base URL (env: ROUTING_BASE_URL)",
+    )
+    routing_profile: str = Field(
+        default="driving",
+        description="Routing profile (env: ROUTING_PROFILE)",
+    )
+    routing_timeout_seconds: float = Field(
+        default=0.9,
+        ge=0.1,
+        description="HTTP timeout for routing requests in seconds (env: ROUTING_TIMEOUT_SECONDS)",
+    )
+    routing_max_retries: int = Field(
+        default=1,
+        ge=0,
+        le=3,
+        description="Max retry attempts for routing requests (env: ROUTING_MAX_RETRIES)",
+    )
+    routing_cache_ttl_seconds: int = Field(
+        default=21600,
+        ge=60,
+        description="Positive-cache TTL for routing responses in seconds (env: ROUTING_CACHE_TTL_SECONDS)",
+    )
+    routing_negative_cache_ttl_seconds: int = Field(
+        default=300,
+        ge=1,
+        description="Negative-cache TTL for routing failures in seconds (env: ROUTING_NEGATIVE_CACHE_TTL_SECONDS)",
+    )
+    routing_cache_max_entries: int = Field(
+        default=256,
+        ge=10,
+        description="Max entries for routing cache (env: ROUTING_CACHE_MAX_ENTRIES)",
+    )
     
     @property
     def cors_origins_list(self) -> List[str]:

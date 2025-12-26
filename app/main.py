@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import random
 from functools import lru_cache
@@ -20,7 +21,7 @@ from .app_context import AppContext
 from .auth import require_admin_api_key
 from .config import settings
 from .data import Dataset, get_synthetic_dataset, loads_from_csv_bytes, write_sample_files
-from .deps import get_ctx, get_ingestion, get_routecast_client, get_scoring
+from .deps import get_ctx, get_ingestion, get_routecast_client, get_routing_client, get_scoring
 from .filters import apply_filters, apply_sort
 from .ingestion.manager import IngestionManager
 from .ingestion.models import Provenance
@@ -28,6 +29,7 @@ from .models import Load, LoadsQuery, RefreshRequest
 from .news import get_news_items
 from .metrics import get_metrics_text
 from .services.routecast_client import RouteCastClient
+from .services.routing_client import RoutingClient
 from .api_models import (
     AlertRuleCreateRequest,
     AlertRuleModel,
@@ -43,6 +45,7 @@ from .api_models import (
     PreferencesResponse,
     RouteCastScoreRequest,
     RouteCastScoreResponse,
+    RouteGeometryResponse,
     ScoredLoadModel,
     ScoredLoadsResponse,
     TriggeredAlertModel,
@@ -54,6 +57,7 @@ from .api_models import (
     WatchlistResponse,
 )
 from .routecast_cache import RouteCastCache
+from .routing_cache import RoutingCache
 from .stores import (
     AlertRulesStore,
     FilterPresetsStore,
@@ -177,6 +181,12 @@ def _build_default_ctx() -> AppContext:
         routecast_cache=RouteCastCache(
             ttl_seconds=settings.routecast_cache_ttl_seconds,
             negative_ttl_seconds=settings.routecast_negative_cache_ttl_seconds,
+        ),
+        routing_client=None,
+        routing_cache=RoutingCache(
+            ttl_seconds=settings.routing_cache_ttl_seconds,
+            negative_ttl_seconds=settings.routing_negative_cache_ttl_seconds,
+            max_entries=settings.routing_cache_max_entries,
         ),
         ingestion_manager=None,
         ingestion_task=None,
@@ -961,6 +971,60 @@ def get_load_route(load_id: str, ctx: AppContext = Depends(get_ctx)) -> LoadRout
         destination=CoordinateModel(lat=d_lat, lon=d_lon),
         stops=[],
     )
+
+
+def _parse_stop_values(raw_stops: List[str] | None) -> List[CoordinateModel]:
+    if not raw_stops:
+        return []
+    tokens: list[str] = []
+    for raw in raw_stops:
+        for item in str(raw).split("|"):
+            item = item.strip()
+            if item:
+                tokens.append(item)
+
+    stops: list[CoordinateModel] = []
+    for token in tokens:
+        parts = [p.strip() for p in token.split(",")]
+        if len(parts) != 2:
+            raise HTTPException(status_code=400, detail="Invalid stop format; expected lat,lon")
+        try:
+            lat = float(parts[0])
+            lon = float(parts[1])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid stop coordinates") from exc
+        if not math.isfinite(lat) or not math.isfinite(lon):
+            raise HTTPException(status_code=400, detail="Invalid stop coordinates")
+        stops.append(CoordinateModel(lat=lat, lon=lon))
+    return stops
+
+
+@app.get("/api/routes", response_model=RouteGeometryResponse)
+def get_route_geometry(
+    origin_lat: float = Query(..., ge=-90, le=90),
+    origin_lng: float = Query(..., ge=-180, le=180),
+    dest_lat: float = Query(..., ge=-90, le=90),
+    dest_lng: float = Query(..., ge=-180, le=180),
+    stops: List[str] | None = Query(
+        default=None,
+        description="Stop coordinates as lat,lon (repeatable or pipe-separated)",
+    ),
+    routing_client: RoutingClient | None = Depends(get_routing_client),
+) -> RouteGeometryResponse:
+    origin = CoordinateModel(lat=float(origin_lat), lon=float(origin_lng))
+    destination = CoordinateModel(lat=float(dest_lat), lon=float(dest_lng))
+    stop_models = _parse_stop_values(stops)
+
+    if routing_client is None:
+        return RouteGeometryResponse(
+            geometry=None,
+            distance_m=None,
+            duration_s=None,
+            provider=settings.routing_provider,
+            provider_error="routing_disabled",
+        )
+
+    return routing_client.route(origin, destination, stop_models)
 
 
 @app.get("/api/loads/{load_id}/trust", response_model=TrustResponse)

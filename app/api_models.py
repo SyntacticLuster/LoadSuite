@@ -38,6 +38,19 @@ class LoadRouteResponse(BaseModel):
     stops: List[CoordinateModel] = Field(default_factory=list)
 
 
+class RouteLineString(BaseModel):
+    type: Literal["LineString"]
+    coordinates: List[List[float]]
+
+
+class RouteGeometryResponse(BaseModel):
+    geometry: Optional[RouteLineString] = None
+    distance_m: Optional[float] = None
+    duration_s: Optional[float] = None
+    provider: str
+    provider_error: Optional[str] = None
+
+
 class RouteCastScoreRequest(BaseModel):
     origin: CoordinateModel
     destination: CoordinateModel

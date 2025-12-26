@@ -9,10 +9,12 @@ from .ingestion.manager import IngestionManager
 from .scoring import ScoringEngine
 from .stores import AlertRulesStore, FilterPresetsStore, PreferencesStore, WatchlistStore
 from .routecast_cache import RouteCastCache
+from .routing_cache import RoutingCache
 
 if TYPE_CHECKING:  # pragma: no cover
     from .services.scoring_service import ScoringService
     from .services.routecast_client import RouteCastClient
+    from .services.routing_client import RoutingClient
 
 
 @dataclass
@@ -27,6 +29,8 @@ class AppContext:
     scoring_service: Optional["ScoringService"]
     routecast_client: Optional["RouteCastClient"]
     routecast_cache: Optional[RouteCastCache]
+    routing_client: Optional["RoutingClient"]
+    routing_cache: Optional[RoutingCache]
 
     ingestion_manager: Optional[IngestionManager]
     ingestion_task: asyncio.Task[None] | None

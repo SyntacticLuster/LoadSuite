@@ -12,6 +12,18 @@ const el = (tag, attrs = {}, children = []) => {
   return node;
 };
 
+const svgEl = (tag, attrs = {}, children = []) => {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v !== undefined && v !== null) node.setAttribute(k, String(v));
+  }
+  for (const child of children) {
+    if (child === null || child === undefined) continue;
+    node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+  }
+  return node;
+};
+
 const THEME_STORAGE_KEY = "lb_theme";
 
 const getTheme = () => {
@@ -461,6 +473,11 @@ const state = {
   routeLookup: { loadId: "", loading: false, error: "", data: null },
   routeAbort: null,
   routeCache: new Map(),
+  routeGeometryLookup: { key: "", loading: false, error: "", data: null },
+  routeGeometryAbort: null,
+  routeGeometryCache: new Map(),
+  routePreviewInFlight: new Map(),
+  routeGeometryPreviewInFlight: new Map(),
   mapInstance: null,
   detailLoadId: "",
   detailLoad: null,
@@ -493,6 +510,7 @@ const WEATHER_FORECAST_TTL_MS = 10 * 60 * 1000;
 const WEATHER_ALERTS_TTL_MS = 2 * 60 * 1000;
 const ROUTECAST_TTL_MS = 2 * 60 * 1000;
 const ROUTE_CACHE_MAX = 50;
+const ROUTE_GEOMETRY_CACHE_MAX = 80;
 const MAP_TILE_URL_DEFAULT = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 const MAP_TILE_ATTRIBUTION_DEFAULT = "© OpenStreetMap © CARTO";
 const isMapDebugEnabled = () => typeof window !== "undefined" && !!window.LB_DEBUG_MAP;
@@ -1129,6 +1147,27 @@ const setRouteCache = (loadId, data) => {
   }
 };
 
+const getRouteGeometryCache = (key) => {
+  const id = String(key || "").trim();
+  if (!id) return null;
+  const cached = state.routeGeometryCache.get(id);
+  if (!cached) return null;
+  state.routeGeometryCache.delete(id);
+  state.routeGeometryCache.set(id, cached);
+  return cached;
+};
+
+const setRouteGeometryCache = (key, data) => {
+  const id = String(key || "").trim();
+  if (!id || !data) return;
+  if (state.routeGeometryCache.has(id)) state.routeGeometryCache.delete(id);
+  state.routeGeometryCache.set(id, data);
+  if (state.routeGeometryCache.size > ROUTE_GEOMETRY_CACHE_MAX) {
+    const oldest = state.routeGeometryCache.keys().next().value;
+    state.routeGeometryCache.delete(oldest);
+  }
+};
+
 const normalizeRoutePoint = (point) => {
   if (!point) return null;
   const lat = Number(point.lat);
@@ -1162,8 +1201,267 @@ const buildRoutePoints = (routeData, polyline) => {
   return points;
 };
 
+const buildRouteSignature = (routeData) => {
+  if (!routeData) return "";
+  const points = buildRoutePoints(routeData, null);
+  if (!points.length) return "";
+  return points.map((p) => `${p.lat.toFixed(4)},${p.lon.toFixed(4)}`).join("|");
+};
+
+const normalizeRouteGeometry = (geometry) => {
+  if (!geometry || geometry.type !== "LineString" || !Array.isArray(geometry.coordinates)) return null;
+  const points = geometry.coordinates
+    .map((coord) => {
+      if (!Array.isArray(coord) || coord.length < 2) return null;
+      const lon = Number(coord[0]);
+      const lat = Number(coord[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      return { lat, lon };
+    })
+    .filter(Boolean);
+  return points.length >= 2 ? points : null;
+};
+
 const buildRouteKey = (points) =>
   points.map((p) => `${p.lat.toFixed(4)},${p.lon.toFixed(4)}`).join("|");
+
+const MINI_ROUTE_VIEWBOX = { width: 120, height: 60, padding: 6 };
+const MINI_ROUTE_OBSERVER_MARGIN = "180px 0px";
+let miniRouteObserver = null;
+const miniRouteObserverCallbacks = new WeakMap();
+
+const observeMiniRoutePreview = (node, onVisible) => {
+  if (!node || typeof onVisible !== "function") return;
+  if (typeof IntersectionObserver === "undefined") {
+    onVisible();
+    return;
+  }
+  if (!miniRouteObserver) {
+    miniRouteObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting && entry.intersectionRatio <= 0) return;
+          const cb = miniRouteObserverCallbacks.get(entry.target);
+          if (!cb) return;
+          miniRouteObserverCallbacks.delete(entry.target);
+          miniRouteObserver.unobserve(entry.target);
+          cb();
+        });
+      },
+      { rootMargin: MINI_ROUTE_OBSERVER_MARGIN }
+    );
+  }
+  miniRouteObserverCallbacks.set(node, onVisible);
+  miniRouteObserver.observe(node);
+};
+
+const buildPreviewRouteData = ({ loadId, origin, destination, stops } = {}) => {
+  const normalizedOrigin = normalizeRoutePoint(origin);
+  const normalizedDestination = normalizeRoutePoint(destination);
+  if (!normalizedOrigin || !normalizedDestination) return null;
+  const normalizedStops = Array.isArray(stops) ? stops.map(normalizeRoutePoint).filter(Boolean) : [];
+  return {
+    load_id: String(loadId || "").trim(),
+    origin: normalizedOrigin,
+    destination: normalizedDestination,
+    stops: normalizedStops,
+  };
+};
+
+const fetchLoadRoutePreview = async (loadId) => {
+  const id = String(loadId || "").trim();
+  if (!id) return null;
+  const cached = getRouteCache(id);
+  if (cached) return cached;
+  if (state.routePreviewInFlight.has(id)) return await state.routePreviewInFlight.get(id);
+  const promise = (async () => {
+    try {
+      const payload = await apiGet(`/api/loads/${encodeURIComponent(id)}/route`);
+      const normalized = _normalizeRoutePayload(payload);
+      if (normalized) setRouteCache(id, normalized);
+      return normalized;
+    } catch {
+      return null;
+    } finally {
+      state.routePreviewInFlight.delete(id);
+    }
+  })();
+  state.routePreviewInFlight.set(id, promise);
+  return await promise;
+};
+
+const fetchRouteGeometryPreview = async (routeData) => {
+  if (!routeData) return null;
+  const signature = buildRouteSignature(routeData);
+  if (!signature) return null;
+  const cached = getRouteGeometryCache(signature);
+  if (cached) return cached;
+  if (state.routeGeometryPreviewInFlight.has(signature)) return await state.routeGeometryPreviewInFlight.get(signature);
+  const promise = (async () => {
+    try {
+      const params = new URLSearchParams();
+      params.set("origin_lat", routeData.origin.lat);
+      params.set("origin_lng", routeData.origin.lon);
+      params.set("dest_lat", routeData.destination.lat);
+      params.set("dest_lng", routeData.destination.lon);
+      if (Array.isArray(routeData.stops)) {
+        routeData.stops.forEach((stop) => {
+          if (!stop) return;
+          params.append("stop_lat", stop.lat);
+          params.append("stop_lng", stop.lon);
+        });
+      }
+      const payload = await apiGet(`/api/routes?${params.toString()}`);
+      const points = normalizeRouteGeometry(payload?.geometry);
+      if (!points) return null;
+      const data = {
+        points,
+        distance_mi: payload?.distance_mi ?? null,
+        duration_s: payload?.duration_s ?? null,
+        provider: payload?.provider || "",
+      };
+      setRouteGeometryCache(signature, data);
+      return data;
+    } catch {
+      return null;
+    } finally {
+      state.routeGeometryPreviewInFlight.delete(signature);
+    }
+  })();
+  state.routeGeometryPreviewInFlight.set(signature, promise);
+  return await promise;
+};
+
+const scaleMiniRoutePoints = (points, { width, height, padding }) => {
+  if (!Array.isArray(points) || points.length < 2) return null;
+  const lats = points.map((p) => p.lat);
+  const lons = points.map((p) => p.lon);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons);
+  const maxLon = Math.max(...lons);
+  const rangeLat = maxLat - minLat || 1;
+  const rangeLon = maxLon - minLon || 1;
+  const scaleX = (width - padding * 2) / rangeLon;
+  const scaleY = (height - padding * 2) / rangeLat;
+  const scale = Math.min(scaleX, scaleY);
+  const offsetX = padding + (width - padding * 2 - rangeLon * scale) / 2;
+  const offsetY = padding + (height - padding * 2 - rangeLat * scale) / 2;
+  return points.map((p) => ({
+    x: offsetX + (p.lon - minLon) * scale,
+    y: offsetY + (maxLat - p.lat) * scale,
+  }));
+};
+
+const buildMiniRouteSvg = (points, { fallback = false } = {}) => {
+  const { width, height, padding } = MINI_ROUTE_VIEWBOX;
+  const scaled = scaleMiniRoutePoints(points, { width, height, padding });
+  if (!scaled) return null;
+  const path = scaled.map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const stroke = fallback ? "rgba(148, 163, 184, 0.45)" : "rgba(148, 163, 184, 0.75)";
+  const markerFill = "rgba(148, 163, 184, 0.9)";
+  return svgEl(
+    "svg",
+    { viewBox: `0 0 ${width} ${height}`, class: "h-full w-full", fill: "none", "aria-hidden": "true" },
+    [
+      svgEl("path", {
+        d: path,
+        stroke,
+        "stroke-width": fallback ? "1.2" : "1.6",
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        ...(fallback ? { "stroke-dasharray": "4 3" } : {}),
+      }),
+      svgEl("circle", { cx: scaled[0].x.toFixed(2), cy: scaled[0].y.toFixed(2), r: "2.2", fill: markerFill }),
+      svgEl("circle", {
+        cx: scaled[scaled.length - 1].x.toFixed(2),
+        cy: scaled[scaled.length - 1].y.toFixed(2),
+        r: "2.6",
+        fill: markerFill,
+      }),
+    ]
+  );
+};
+
+const renderMiniRoutePreview = ({ loadId, origin, destination, stops, routeGeometry } = {}) => {
+  const wrap = el(
+    "div",
+    {
+      class:
+        "relative hidden h-[74px] w-[220px] flex-shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-800/80 bg-slate-950/60 lg:flex",
+      "data-mini-route-preview": String(loadId || ""),
+    },
+    []
+  );
+  const grid = el("div", {
+    class: "absolute inset-0 opacity-50",
+    style:
+      "background-image: linear-gradient(90deg, rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(0deg, rgba(148,163,184,0.06) 1px, transparent 1px); background-size: 18px 18px;",
+  });
+  const content = el("div", { class: "relative h-full w-full px-2 py-2" }, []);
+  const placeholder = el(
+    "div",
+    { class: "absolute inset-0 flex items-center justify-center text-[0.6rem] font-semibold uppercase tracking-[0.35em] text-slate-500/70 animate-pulse" },
+    ["Routing…"]
+  );
+  wrap.appendChild(grid);
+  wrap.appendChild(content);
+  wrap.appendChild(placeholder);
+
+  const setContent = (node) => {
+    content.innerHTML = "";
+    if (node) content.appendChild(node);
+  };
+
+  const showPlaceholder = (text) => {
+    placeholder.textContent = text;
+    placeholder.style.display = "";
+  };
+
+  const hidePlaceholder = () => {
+    placeholder.style.display = "none";
+  };
+
+  const renderPoints = (points, { fallback = false } = {}) => {
+    const svg = buildMiniRouteSvg(points, { fallback });
+    if (!svg) return false;
+    setContent(svg);
+    hidePlaceholder();
+    return true;
+  };
+
+  const renderFallback = (routeData) => {
+    if (!routeData?.origin || !routeData?.destination) return false;
+    return renderPoints([routeData.origin, routeData.destination], { fallback: true });
+  };
+
+  const directGeometryPoints = normalizeRouteGeometry(routeGeometry);
+  if (directGeometryPoints && renderPoints(directGeometryPoints)) return wrap;
+
+  const previewRouteData = buildPreviewRouteData({ loadId, origin, destination, stops }) || getRouteCache(loadId);
+  const signature = previewRouteData ? buildRouteSignature(previewRouteData) : "";
+  const cachedGeometry = signature ? getRouteGeometryCache(signature) : null;
+  if (cachedGeometry?.points && renderPoints(cachedGeometry.points)) return wrap;
+
+  if (!previewRouteData) showPlaceholder("Routing…");
+  else showPlaceholder("Routing…");
+
+  observeMiniRoutePreview(wrap, async () => {
+    const routeData = previewRouteData || (await fetchLoadRoutePreview(loadId));
+    if (!routeData) {
+      showPlaceholder("Route unavailable");
+      return;
+    }
+    const liveSignature = buildRouteSignature(routeData);
+    const cached = liveSignature ? getRouteGeometryCache(liveSignature) : null;
+    if (cached?.points && renderPoints(cached.points)) return;
+    const geometry = await fetchRouteGeometryPreview(routeData);
+    if (geometry?.points && renderPoints(geometry.points)) return;
+    if (!renderFallback(routeData)) showPlaceholder("Route unavailable");
+  });
+
+  return wrap;
+};
 
 const detailRenderStats = {
   count: 0,
@@ -1230,13 +1528,26 @@ const renderLeafletMap = async (containerId, routeData, polyline) => {
       teardownMapInstance("container_detached");
     }
 
-    if (state.mapInstance && state.mapInstance.routeKey === routeKey) {
-      state.mapInstance.map.invalidateSize();
-      return;
-    }
-
     if (state.mapInstance) {
-      teardownMapInstance("route_changed");
+      if (state.mapInstance.routeKey === routeKey) {
+        state.mapInstance.map.invalidateSize();
+        return;
+      }
+
+      const latLngs = points.map((p) => [p.lat, p.lon]);
+      try {
+        state.mapInstance.line.setLatLngs(latLngs);
+        if (state.mapInstance.markers?.length >= 2) {
+          state.mapInstance.markers[0].setLatLng(latLngs[0]);
+          state.mapInstance.markers[1].setLatLng(latLngs[latLngs.length - 1]);
+        }
+        state.mapInstance.map.fitBounds(state.mapInstance.line.getBounds(), { padding: [24, 24] });
+        state.mapInstance.routeKey = routeKey;
+        state.mapInstance.map.invalidateSize();
+        return;
+      } catch {
+        teardownMapInstance("route_update_failed");
+      }
     }
 
     const map = L.map(container, {
@@ -1294,15 +1605,25 @@ const renderMapPanel = ({ loadId, origin, destination, polyline } = {}) => {
   const destinationLabel = destination ? `${destination.city}, ${destination.state}` : "Destination";
   const activeRoute = state.routeLookup.loadId === loadId ? state.routeLookup : { loadId, loading: false, error: "", data: null };
   const mapId = `load-map-${loadId || "unknown"}`;
+  const routeSignature = activeRoute.data ? buildRouteSignature(activeRoute.data) : "";
+  const geometryActive = !!routeSignature && state.routeGeometryLookup.key === routeSignature;
+  const cachedGeometry = routeSignature ? getRouteGeometryCache(routeSignature) : null;
+  const routeGeometry = geometryActive ? state.routeGeometryLookup.data : cachedGeometry;
+  const routeGeometryLoading = geometryActive ? state.routeGeometryLookup.loading : false;
+  const routeGeometryError = geometryActive ? state.routeGeometryLookup.error : "";
+  const activePolyline = routeGeometry?.points || polyline;
 
   const shouldRenderMap = !activeRoute.loading && !activeRoute.error && activeRoute.data;
   if (shouldRenderMap) {
+    if (routeSignature && !routeGeometry && !routeGeometryLoading) {
+      void fetchRouteGeometry(activeRoute.data);
+    }
     requestAnimationFrame(() => {
       const container = document.getElementById(mapId);
       if (!container) return;
       if (isMapDebugEnabled()) {
         const rect = container.getBoundingClientRect();
-        const points = buildRoutePoints(activeRoute.data, polyline);
+        const points = buildRoutePoints(activeRoute.data, activePolyline);
         mapDebug("Map panel render", {
           loadId,
           mapId,
@@ -1311,7 +1632,7 @@ const renderMapPanel = ({ loadId, origin, destination, polyline } = {}) => {
           height: rect.height,
         });
       }
-      renderLeafletMap(mapId, activeRoute.data, polyline);
+      renderLeafletMap(mapId, activeRoute.data, activePolyline);
     });
   }
 
@@ -1367,7 +1688,15 @@ const renderMapPanel = ({ loadId, origin, destination, polyline } = {}) => {
     [
       el("div", { class: "flex items-center justify-between" }, [
         el("div", { class: "text-sm font-semibold text-slate-900 dark:text-slate-100" }, ["Map"]),
-        polyline ? el("div", { class: "text-xs text-slate-500 dark:text-slate-400" }, ["Route preview"]) : null,
+        routeGeometryLoading
+          ? el("div", { class: "text-xs text-slate-500 dark:text-slate-400" }, ["Routing…"])
+          : routeGeometryError
+            ? el("div", { class: "text-xs text-slate-500 dark:text-slate-400" }, ["Route unavailable"])
+            : activePolyline && !polyline
+              ? el("div", { class: "text-xs text-slate-500 dark:text-slate-400" }, ["Routed"])
+              : polyline
+                ? el("div", { class: "text-xs text-slate-500 dark:text-slate-400" }, ["Route preview"])
+                : null,
       ].filter(Boolean)),
       el("div", { class: "pt-2 text-xs text-slate-600 dark:text-slate-400" }, [
         `${originLabel} → ${destinationLabel}`,
@@ -1414,6 +1743,78 @@ const _normalizeRoutePayload = (payload) => {
   };
 };
 
+const fetchRouteGeometry = async (routeData, { force = false } = {}) => {
+  if (!routeData) return;
+  const signature = buildRouteSignature(routeData);
+  if (!signature) return;
+
+  if (!force) {
+    const cached = getRouteGeometryCache(signature);
+    if (cached) {
+      state.routeGeometryLookup = { key: signature, loading: false, error: "", data: cached };
+      return;
+    }
+    if (state.routeGeometryLookup.loading && state.routeGeometryLookup.key === signature) return;
+    if (state.routeGeometryLookup.data && state.routeGeometryLookup.key === signature) return;
+  }
+
+  if (state.routeGeometryAbort) {
+    try {
+      state.routeGeometryAbort.abort();
+    } catch {}
+  }
+
+  const controller = new AbortController();
+  state.routeGeometryAbort = controller;
+  state.routeGeometryLookup = { key: signature, loading: true, error: "", data: null };
+  render();
+
+  try {
+    const params = new URLSearchParams();
+    params.set("origin_lat", routeData.origin.lat);
+    params.set("origin_lng", routeData.origin.lon);
+    params.set("dest_lat", routeData.destination.lat);
+    params.set("dest_lng", routeData.destination.lon);
+    if (Array.isArray(routeData.stops)) {
+      routeData.stops.forEach((stop) => {
+        if (!stop) return;
+        params.append("stops", `${stop.lat},${stop.lon}`);
+      });
+    }
+
+    const payload = await apiGetWithSignal(`/api/routes?${params.toString()}`, controller.signal);
+    if (state.routeGeometryLookup.key !== signature) return;
+    const points = normalizeRouteGeometry(payload?.geometry);
+    if (!points) {
+      state.routeGeometryLookup = {
+        key: signature,
+        loading: false,
+        error: payload?.provider_error || "route_unavailable",
+        data: null,
+      };
+      render();
+      return;
+    }
+
+    const data = {
+      points,
+      distance_m: payload?.distance_m ?? null,
+      duration_s: payload?.duration_s ?? null,
+      provider: payload?.provider || "",
+    };
+    setRouteGeometryCache(signature, data);
+    state.routeGeometryLookup = { key: signature, loading: false, error: "", data };
+    render();
+  } catch (err) {
+    if (err?.name === "AbortError") return;
+    if (state.routeGeometryLookup.key !== signature) return;
+    state.routeGeometryLookup = { key: signature, loading: false, error: "routing_error", data: null };
+    render();
+  } finally {
+    if (state.routeGeometryAbort === controller) state.routeGeometryAbort = null;
+  }
+};
+
 const fetchLoadRoute = async (loadId, { force = false, renderOnStart = false } = {}) => {
   const id = String(loadId || "").trim();
   if (!id) return;
@@ -1432,6 +1833,12 @@ const fetchLoadRoute = async (loadId, { force = false, renderOnStart = false } =
     try {
       state.routeAbort.abort();
     } catch {}
+  }
+  if (state.routeGeometryAbort) {
+    try {
+      state.routeGeometryAbort.abort();
+    } catch {}
+    state.routeGeometryAbort = null;
   }
 
   const controller = new AbortController();
@@ -2182,6 +2589,17 @@ const renderLoadGrid = (loads) => {
       [isWatched ? "★" : "☆"]
     );
 
+    const showMiniRoutePreview = state.uiPrefs.greenlight_full_row && greenlightOk;
+    const miniRoutePreview = showMiniRoutePreview
+      ? renderMiniRoutePreview({
+          loadId: load.id,
+          origin: load.origin,
+          destination: load.destination,
+          stops: load.stops,
+          routeGeometry: null,
+        })
+      : null;
+
     const row = el(
       "a",
       {
@@ -2228,6 +2646,8 @@ const renderLoadGrid = (loads) => {
               ),
             ]),
           ].filter(Boolean)),
+
+          miniRoutePreview,
 
           el("div", { class: "flex flex-col items-end justify-between self-stretch text-right" }, [
             el("div", { class: "flex flex-col items-end gap-1" }, [

@@ -229,6 +229,49 @@ Return route coordinates for a load (origin/destination + optional stops).
 
 ---
 
+#### GET /api/routes
+
+Return a routed geometry between origin/destination coordinates (and optional stops).
+
+**Query Parameters:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `origin_lat` | number | Origin latitude |
+| `origin_lng` | number | Origin longitude |
+| `dest_lat` | number | Destination latitude |
+| `dest_lng` | number | Destination longitude |
+| `stops` | string | Optional repeatable `lat,lon` stop coordinates |
+
+**Response:**
+
+```json
+{
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [-84.3881, 33.7489],
+      [-87.6298, 41.8781]
+    ]
+  },
+  "distance_m": 112233.4,
+  "duration_s": 9876.5,
+  "provider": "osrm",
+  "provider_error": null
+}
+```
+
+When the routing provider fails, the endpoint returns `geometry: null` and a `provider_error`.
+
+**Status Codes:**
+
+| Code | Description |
+|------|-------------|
+| 200 | Success (geometry may be null on provider failure) |
+| 400 | Invalid coordinates |
+
+---
+
 ### Data Management
 
 #### POST /api/refresh

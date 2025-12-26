@@ -47,6 +47,23 @@ The Load Details map uses Leaflet with a dark tile layer by default. To override
 </script>
 ```
 
+## Routing geometry (optional)
+
+To draw real road-following routes on the Load Details map, configure the routing provider:
+
+```bash
+export ROUTING_PROVIDER="osrm"
+export ROUTING_BASE_URL="https://router.project-osrm.org"
+export ROUTING_PROFILE="driving"
+export ROUTING_TIMEOUT_SECONDS=0.9
+export ROUTING_MAX_RETRIES=1
+export ROUTING_CACHE_TTL_SECONDS=21600
+export ROUTING_NEGATIVE_CACHE_TTL_SECONDS=300
+export ROUTING_CACHE_MAX_ENTRIES=256
+```
+
+If routing fails or is disabled, the UI falls back to the straight-line (crow-fly) polyline.
+
 ## CLI utilities
 
 The CLI reads any JSON/CSV following the schema in `sample_data/` and supports the same filters/sort options as the web UI.
